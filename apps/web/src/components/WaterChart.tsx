@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { LineChart, type CustomTooltipProps } from "@tremor/react";
 import type { TimeseriesPoint } from "@ai-water-usage/shared";
 import { formatLitres, formatNumber } from "../lib/format";
 
@@ -6,103 +6,102 @@ interface WaterChartProps {
   points: TimeseriesPoint[];
 }
 
-function buildPath(points: Array<{ x: number; y: number }>): string {
-  return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+interface ChartDatum {
+  label: string;
+  central: number;
+  low: number;
+  high: number;
+  tokens: number;
+  excludedTokens: number;
+  unestimatedTokens: number;
+}
+
+function TrendTooltip({ active, payload, label }: CustomTooltipProps) {
+  const point = payload?.[0]?.payload as ChartDatum | undefined;
+
+  if (!active || !point) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-[22px] border border-stone-800 bg-stone-950 px-4 py-4 text-stone-50 shadow-[0_24px_50px_-32px_rgba(28,25,23,0.75)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">{label}</p>
+      <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-white">{formatLitres(point.central)}</p>
+      <p className="mt-1 text-sm leading-6 text-stone-300">
+        Range {formatLitres(point.low)} to {formatLitres(point.high)}
+      </p>
+      <p className="mt-3 text-sm text-stone-300">{formatNumber(point.tokens)} tokens</p>
+      {(point.excludedTokens > 0 || point.unestimatedTokens > 0) && (
+        <p className="mt-1 text-sm text-stone-400">
+          {point.excludedTokens > 0 ? `${formatNumber(point.excludedTokens)} excluded` : ""}
+          {point.excludedTokens > 0 && point.unestimatedTokens > 0 ? " · " : ""}
+          {point.unestimatedTokens > 0 ? `${formatNumber(point.unestimatedTokens)} unestimated` : ""}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function WaterChart({ points }: WaterChartProps) {
-  const [activeIndex, setActiveIndex] = useState<number>(Math.max(points.length - 1, 0));
-
-  useEffect(() => {
-    setActiveIndex(Math.max(points.length - 1, 0));
-  }, [points]);
-
-  if (points.length === 0) {
-    return <div className="chart-empty">No Codex usage events were found for the selected bucket.</div>;
-  }
-
-  const width = 860;
-  const height = 300;
-  const padding = { top: 20, right: 24, bottom: 36, left: 24 };
-  const innerWidth = width - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
-  const maxHigh = Math.max(...points.map((point) => point.waterLitres.high), 1);
-
-  const coordinates = points.map((point, index) => {
-    const denominator = Math.max(points.length - 1, 1);
-    const x = padding.left + (innerWidth * index) / denominator;
-    const toY = (value: number) => padding.top + innerHeight - (value / maxHigh) * innerHeight;
-    return {
-      x,
-      centerY: toY(point.waterLitres.central),
-      lowY: toY(point.waterLitres.low),
-      highY: toY(point.waterLitres.high)
-    };
-  });
-
-  const upperPath = buildPath(coordinates.map((point) => ({ x: point.x, y: point.highY })));
-  const lowerPath = buildPath([...coordinates].reverse().map((point) => ({ x: point.x, y: point.lowY })));
-  const bandPath = `${upperPath} ${lowerPath.replace(/^M/, "L")} Z`;
-  const centerPath = buildPath(coordinates.map((point) => ({ x: point.x, y: point.centerY })));
-  const safeActiveIndex = Math.min(activeIndex, points.length - 1);
-  const activePoint = points[safeActiveIndex]!;
+  const chartData = points.map((point) => ({
+    label: point.label,
+    central: point.waterLitres.central,
+    low: point.waterLitres.low,
+    high: point.waterLitres.high,
+    tokens: point.tokens,
+    excludedTokens: point.excludedTokens,
+    unestimatedTokens: point.unestimatedTokens
+  }));
+  const latestPoint = points.length > 0 ? points[points.length - 1] : null;
 
   return (
-    <div className="chart-shell">
-      <svg className="water-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Water usage chart">
-        <defs>
-          <linearGradient id="water-band" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgba(57, 124, 255, 0.24)" />
-            <stop offset="100%" stopColor="rgba(57, 124, 255, 0.02)" />
-          </linearGradient>
-        </defs>
-        <line x1={padding.left} x2={width - padding.right} y1={height - padding.bottom} y2={height - padding.bottom} className="chart-axis" />
-        <path d={bandPath} className="chart-band" />
-        <path d={centerPath} className="chart-line" />
-        {coordinates.map((point, index) => {
-          const chartPoint = points[index]!;
-          const previousPoint = index === 0 ? null : coordinates[index - 1]!;
-          const nextPoint = index === points.length - 1 ? null : coordinates[index + 1]!;
-          const leftBoundary = previousPoint ? (previousPoint.x + point.x) / 2 : padding.left;
-          const rightBoundary = nextPoint ? (nextPoint.x + point.x) / 2 : width - padding.right;
-          return (
-          <g key={chartPoint.key}>
-            <rect
-              x={leftBoundary}
-              y={padding.top}
-              width={rightBoundary - leftBoundary}
-              height={innerHeight}
-              className="chart-hitbox"
-              onMouseEnter={() => setActiveIndex(index)}
-              onFocus={() => setActiveIndex(index)}
-              tabIndex={0}
-              aria-label={`${chartPoint.label}: ${formatLitres(chartPoint.waterLitres.central)}`}
-            />
-            <circle
-              cx={point.x}
-              cy={point.centerY}
-              r={activeIndex === index ? 6 : 4}
-              className={activeIndex === index ? "chart-dot is-active" : "chart-dot"}
-            />
-          </g>
-          );
-        })}
-      </svg>
-      <div className="chart-tooltip shimmer-panel" aria-live="polite">
-        <p className="chart-tooltip-label">{activePoint.label}</p>
-        <p className="chart-tooltip-primary">{formatLitres(activePoint.waterLitres.central)}</p>
-        <p className="chart-tooltip-detail">
-          Range {formatLitres(activePoint.waterLitres.low)} to {formatLitres(activePoint.waterLitres.high)}
-        </p>
-        <p className="chart-tooltip-detail">{formatNumber(activePoint.tokens)} tokens</p>
-        {(activePoint.excludedTokens > 0 || activePoint.unestimatedTokens > 0) && (
-          <p className="chart-tooltip-note">
-            {activePoint.excludedTokens > 0 ? `${formatNumber(activePoint.excludedTokens)} excluded` : ""}
-            {activePoint.excludedTokens > 0 && activePoint.unestimatedTokens > 0 ? " · " : ""}
-            {activePoint.unestimatedTokens > 0 ? `${formatNumber(activePoint.unestimatedTokens)} unestimated` : ""}
-          </p>
-        )}
+    <div className="mt-8">
+      {latestPoint ? (
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <div className="panel-muted p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Latest central</p>
+            <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-stone-950">
+              {formatLitres(latestPoint.waterLitres.central)}
+            </p>
+          </div>
+          <div className="panel-muted p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Current range</p>
+            <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-stone-950">
+              {formatLitres(latestPoint.waterLitres.low)} to {formatLitres(latestPoint.waterLitres.high)}
+            </p>
+          </div>
+          <div className="panel-muted p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Latest tokens</p>
+            <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-stone-950">
+              {formatNumber(latestPoint.tokens)}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="rounded-[28px] border border-stone-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(247,247,245,0.98))] p-4 sm:p-6">
+        <LineChart
+          data={chartData}
+          index="label"
+          categories={["central"]}
+          colors={["sky"]}
+          className="h-80 min-h-[20rem]"
+          yAxisWidth={70}
+          valueFormatter={formatLitres}
+          customTooltip={TrendTooltip}
+          showLegend={false}
+          showAnimation={false}
+          showGridLines
+          curveType="monotone"
+          noDataText="No water estimate available for this bucket."
+          aria-label="Water usage trend"
+        />
       </div>
+
+      <p className="mt-4 text-sm leading-6 text-stone-600">
+        The chart emphasizes the central estimate while keeping range detail in every point inspection. Empty buckets remain
+        explicit rather than collapsing into zero.
+      </p>
     </div>
   );
 }
