@@ -1,4 +1,3 @@
-[ ] Ensure compatability with Mac/Windows
 [ ] Fix ugly icons
 [ ] Move graph to usage over time
 [ ] Session/prompt level water analysis
@@ -6,5 +5,5 @@
 - Sessions/prompts, tokens
 - Big water usage card
 - Add coffee, jeans and car comparison for water
-[ ] Add energy comparison
-[ ]
+[ ] Add energy, co2 comparison
+[ ] Read claude sessions
