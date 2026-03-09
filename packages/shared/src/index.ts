@@ -34,6 +34,14 @@ export interface CalibrationSnapshot {
   supportedMedianSource: string;
 }
 
+export type DiagnosticsState = "ready" | "no_data" | "read_error";
+
+export interface OverviewDiagnostics {
+  state: DiagnosticsState;
+  codexHome: string;
+  message: string | null;
+}
+
 export interface OverviewResponse {
   tokenTotals: TokenTotals;
   waterLitres: WaterRange;
@@ -41,6 +49,7 @@ export interface OverviewResponse {
   exclusions: ExclusionSummary[];
   lastIndexedAt: number | null;
   calibration: CalibrationSnapshot | null;
+  diagnostics: OverviewDiagnostics;
 }
 
 export interface TimeseriesPoint {

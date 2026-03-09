@@ -1,6 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getOrCreateCalibration } from "../src/calibration.js";
 import { BENCHMARK_COEFFICIENTS, calculateEventCostUsd, getMethodologySourceLinks, getPricingEntry } from "../src/pricing.js";
+import { createCacheDir } from "./helpers.js";
+
+let previousCacheDir: string | undefined;
+let cleanupCacheDir: (() => void) | null = null;
+
+beforeEach(() => {
+  previousCacheDir = process.env.AI_WATER_USAGE_CACHE_DIR;
+  const cache = createCacheDir();
+  process.env.AI_WATER_USAGE_CACHE_DIR = cache.dir;
+  cleanupCacheDir = cache.cleanup;
+});
+
+afterEach(() => {
+  if (cleanupCacheDir) {
+    cleanupCacheDir();
+    cleanupCacheDir = null;
+  }
+
+  if (previousCacheDir === undefined) {
+    delete process.env.AI_WATER_USAGE_CACHE_DIR;
+  } else {
+    process.env.AI_WATER_USAGE_CACHE_DIR = previousCacheDir;
+  }
+});
 
 describe("pricing methodology", () => {
   it("looks up cached-input pricing correctly", () => {

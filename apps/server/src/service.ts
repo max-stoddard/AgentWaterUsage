@@ -1,8 +1,14 @@
 import fs from "node:fs";
-import type { MethodologyResponse, OverviewResponse, TimeseriesResponse, WaterRange } from "@ai-water-usage/shared";
+import type {
+  MethodologyResponse,
+  OverviewDiagnostics,
+  OverviewResponse,
+  TimeseriesResponse,
+  WaterRange
+} from "@ai-water-usage/shared";
 import { getOrCreateCalibration, buildSignature } from "./calibration.js";
 import { listSessionFiles, getTuiLogPath } from "./discovery.js";
-import { getDefaultCodexHome } from "./paths.js";
+import { getCodexHomeConfig } from "./paths.js";
 import { parseSessionFile, parseTuiFallback } from "./parser.js";
 import { aggregateTimeseries } from "./aggregation.js";
 import { BENCHMARK_COEFFICIENTS, PRICING_TABLE, calculateEventCostUsd, getMethodologySourceLinks, getPricingEntry } from "./pricing.js";
@@ -43,6 +49,48 @@ function dedupeEvents(events: RawUsageEvent[]): RawUsageEvent[] {
     }
   }
   return [...map.values()].sort((a, b) => a.ts - b.ts);
+}
+
+function createDiagnostics(
+  state: OverviewDiagnostics["state"],
+  codexHome: string,
+  message: string | null
+): OverviewDiagnostics {
+  return {
+    state,
+    codexHome,
+    message
+  };
+}
+
+function createSnapshot(signature: string, diagnostics: OverviewDiagnostics): DataSnapshot {
+  return {
+    signature,
+    events: [],
+    exclusions: [],
+    pricingTable: PRICING_TABLE,
+    sourceLinks: getMethodologySourceLinks(),
+    benchmarks: BENCHMARK_COEFFICIENTS,
+    calibration: null,
+    lastIndexedAt: null,
+    diagnostics
+  };
+}
+
+function getNoDataMessage(foundFiles: boolean, foundLog: boolean): string {
+  if (foundFiles || foundLog) {
+    return "Codex data was found, but no token history could be parsed yet.";
+  }
+
+  return "No Codex usage files were found in this directory yet.";
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "The local Codex usage directory could not be read.";
 }
 
 function classifyEvents(rawEvents: RawUsageEvent[], signature: string): Pick<DataSnapshot, "events" | "exclusions" | "calibration"> {
@@ -177,7 +225,8 @@ export class DashboardService {
       },
       exclusions: snapshot.exclusions,
       lastIndexedAt: snapshot.lastIndexedAt,
-      calibration: snapshot.calibration
+      calibration: snapshot.calibration,
+      diagnostics: snapshot.diagnostics
     };
   }
 
@@ -201,33 +250,84 @@ export class DashboardService {
   }
 
   private getSnapshot(): DataSnapshot {
-    const codexHome = getDefaultCodexHome();
-    const files = listSessionFiles(codexHome);
-    const tuiLogPath = getTuiLogPath(codexHome);
-    const logFingerprint = fs.existsSync(tuiLogPath)
-      ? [{ path: tuiLogPath, mtimeMs: Math.floor(fs.statSync(tuiLogPath).mtimeMs), size: fs.statSync(tuiLogPath).size }]
-      : [];
-    const fingerprint = [...files.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size })), ...logFingerprint];
-    const signature = buildSignature(fingerprint);
-    if (this.cachedSnapshot?.signature === signature) {
+    const codexHomeConfig = getCodexHomeConfig();
+    const codexHome = codexHomeConfig.path;
+
+    try {
+      if (!fs.existsSync(codexHome)) {
+        const diagnostics = codexHomeConfig.fromEnv
+          ? createDiagnostics("read_error", codexHome, "Configured Codex home does not exist.")
+          : createDiagnostics("no_data", codexHome, "No local Codex history was found yet.");
+        return this.getOrCacheSnapshot(
+          createSnapshot(buildSignature({ codexHome, codexHomeState: "missing", fileFingerprint: [] }), diagnostics)
+        );
+      }
+
+      if (!fs.statSync(codexHome).isDirectory()) {
+        const diagnostics = createDiagnostics("read_error", codexHome, "Configured Codex home is not a directory.");
+        return this.getOrCacheSnapshot(
+          createSnapshot(buildSignature({ codexHome, codexHomeState: "not_directory", fileFingerprint: [] }), diagnostics)
+        );
+      }
+
+      const files = listSessionFiles(codexHome);
+      const tuiLogPath = getTuiLogPath(codexHome);
+      const logFingerprint = fs.existsSync(tuiLogPath)
+        ? [{ path: tuiLogPath, mtimeMs: Math.floor(fs.statSync(tuiLogPath).mtimeMs), size: fs.statSync(tuiLogPath).size }]
+        : [];
+      const fingerprint = [...files.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size })), ...logFingerprint];
+      const fallbackMap = parseTuiFallback(tuiLogPath);
+      const rawEvents = dedupeEvents(files.flatMap((file) => parseSessionFile(file.path, fallbackMap)));
+      const diagnostics =
+        rawEvents.length > 0
+          ? createDiagnostics("ready", codexHome, null)
+          : createDiagnostics("no_data", codexHome, getNoDataMessage(files.length > 0, logFingerprint.length > 0));
+      const signature = buildSignature({
+        codexHome,
+        codexHomeState: diagnostics.state === "ready" ? "ready" : "empty",
+        fileFingerprint: fingerprint
+      });
+
+      if (this.cachedSnapshot?.signature === signature) {
+        return this.cachedSnapshot;
+      }
+
+      const classified = classifyEvents(rawEvents, signature);
+      const lastIndexedAt = files.length > 0 ? Math.max(...files.map((file) => file.mtimeMs)) : null;
+
+      this.cachedSnapshot = {
+        signature,
+        events: classified.events,
+        exclusions: classified.exclusions,
+        pricingTable: PRICING_TABLE,
+        sourceLinks: getMethodologySourceLinks(),
+        benchmarks: BENCHMARK_COEFFICIENTS,
+        calibration: classified.calibration,
+        lastIndexedAt,
+        diagnostics
+      };
+      return this.cachedSnapshot;
+    } catch (error) {
+      const diagnostics = createDiagnostics("read_error", codexHome, getErrorMessage(error));
+      return this.getOrCacheSnapshot(
+        createSnapshot(
+          buildSignature({
+            codexHome,
+            codexHomeState: "read_error",
+            fileFingerprint: []
+          }),
+          diagnostics
+        )
+      );
+    }
+  }
+
+  private getOrCacheSnapshot(snapshot: DataSnapshot): DataSnapshot {
+    if (this.cachedSnapshot?.signature === snapshot.signature) {
       return this.cachedSnapshot;
     }
 
-    const fallbackMap = parseTuiFallback(tuiLogPath);
-    const rawEvents = dedupeEvents(files.flatMap((file) => parseSessionFile(file.path, fallbackMap)));
-    const classified = classifyEvents(rawEvents, signature);
-    const lastIndexedAt = files.length > 0 ? Math.max(...files.map((file) => file.mtimeMs)) : null;
-
-    this.cachedSnapshot = {
-      signature,
-      events: classified.events,
-      exclusions: classified.exclusions,
-      pricingTable: PRICING_TABLE,
-      sourceLinks: getMethodologySourceLinks(),
-      benchmarks: BENCHMARK_COEFFICIENTS,
-      calibration: classified.calibration,
-      lastIndexedAt
-    };
-    return this.cachedSnapshot;
+    this.cachedSnapshot = snapshot;
+    return snapshot;
   }
 }

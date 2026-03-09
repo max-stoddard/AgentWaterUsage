@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { createCodexHome, writeJsonlFile, writeTuiLog } from "./helpers.js";
+import { createCacheDir, createCodexHome, writeJsonlFile, writeTuiLog } from "./helpers.js";
 
 let previousCodexHome: string | undefined;
+let previousCacheDir: string | undefined;
 
 beforeEach(() => {
   previousCodexHome = process.env.CODEX_HOME;
+  previousCacheDir = process.env.AI_WATER_USAGE_CACHE_DIR;
 });
 
 afterEach(() => {
@@ -14,12 +16,20 @@ afterEach(() => {
   } else {
     process.env.CODEX_HOME = previousCodexHome;
   }
+
+  if (previousCacheDir === undefined) {
+    delete process.env.AI_WATER_USAGE_CACHE_DIR;
+  } else {
+    process.env.AI_WATER_USAGE_CACHE_DIR = previousCacheDir;
+  }
 });
 
 describe("API routes", () => {
   it("serves overview, timeseries, and methodology consistently", async () => {
     const codex = createCodexHome();
+    const cache = createCacheDir();
     process.env.CODEX_HOME = codex.dir;
+    process.env.AI_WATER_USAGE_CACHE_DIR = cache.dir;
 
     const sessionId = "session-openai";
     writeJsonlFile(codex.dir, "sessions/2026/03/09/rollout-openai.jsonl", [
@@ -151,5 +161,6 @@ describe("API routes", () => {
 
     await app.close();
     codex.cleanup();
+    cache.cleanup();
   });
 });

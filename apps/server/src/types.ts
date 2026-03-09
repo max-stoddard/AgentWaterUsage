@@ -1,4 +1,4 @@
-import type { CalibrationSnapshot, PricingEntry, WaterRange } from "@ai-water-usage/shared";
+import type { CalibrationSnapshot, OverviewDiagnostics, PricingEntry, WaterRange } from "@ai-water-usage/shared";
 
 export interface FileRecord {
   path: string;
@@ -45,4 +45,5 @@ export interface DataSnapshot {
   benchmarks: WaterRange;
   calibration: CalibrationSnapshot | null;
   lastIndexedAt: number | null;
+  diagnostics: OverviewDiagnostics;
 }
