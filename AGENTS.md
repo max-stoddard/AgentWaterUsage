@@ -1,0 +1,8 @@
+- Aim of the website is to provide developing with insights into their LLM usage, particulary relating to water usage and help them understand and quantify how much water their token/AI usage is actually using.
+  - You MUST question prompts if they don't align with this core aim.
+- You MUST write clean, modular, effective code.
+- You MUST reuse existing shared and helper code as much as possible.
+- You MUST ensure all code you write aligns with existing website styling and reuse shared styling wherever possible.
+- Git commits MUST be in the format `<type> [ms]: <message>` where `<message>` is short, concise, easy to understand and effectively conveys what changed and why changes were made.
+  - Do not add what: or why: to git message.
+  - Ensure commits are small changes, not big commits.
