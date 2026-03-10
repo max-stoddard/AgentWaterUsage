@@ -5,8 +5,9 @@ import { AgentMark } from "./components/AgentMark";
 import { HomeView } from "./views/HomeView";
 import { MethodologyView } from "./views/MethodologyView";
 import { PlaceholderView } from "./views/PlaceholderView";
+import { WaterView } from "./views/WaterView";
 
-type AppView = "home" | "usage-over-time" | "prompts" | "methodology";
+type AppView = "home" | "prompts" | "water" | "energy" | "co2" | "methodology";
 
 const NAV_ITEMS: Array<{
   description: string;
@@ -18,25 +19,37 @@ const NAV_ITEMS: Array<{
     view: "home",
     hash: "#home",
     label: "Home",
-    description: "Water usage estimate from your Codex history"
-  },
-  {
-    view: "usage-over-time",
-    hash: "#usage-over-time",
-    label: "Usage over time",
-    description: "A dedicated trend page for longer-range water usage analysis is coming soon."
+    description: "A compact overview of your local coding-agent usage and available estimate views."
   },
   {
     view: "prompts",
     hash: "#prompts",
     label: "Prompts",
-    description: "Prompt-level water analysis and prompt attribution are coming soon."
+    description: "Prompt-level analysis and attribution will live here once prompt data is surfaced."
+  },
+  {
+    view: "water",
+    hash: "#water",
+    label: "Water",
+    description: "Explore the current water estimate, trend, and estimate coverage."
+  },
+  {
+    view: "energy",
+    hash: "#energy",
+    label: "Energy",
+    description: "Energy estimates will join the same local workflow once that data is available."
+  },
+  {
+    view: "co2",
+    hash: "#co2",
+    label: "CO2",
+    description: "CO2 estimates will appear here alongside the rest of the footprint views."
   },
   {
     view: "methodology",
     hash: "#methodology",
     label: "Methodology",
-    description: "Water estimate assumptions, pricing references, and exclusions."
+    description: "Review the assumptions, coverage rules, and pricing references behind the current estimates."
   }
 ];
 
@@ -94,7 +107,7 @@ export default function App() {
   }, [loadedTimeZone, timeZone]);
 
   useEffect(() => {
-    if (activeView !== "home" && activeView !== "methodology") {
+    if (activeView !== "home" && activeView !== "water" && activeView !== "methodology") {
       return;
     }
 
@@ -129,7 +142,7 @@ export default function App() {
   }, [activeView, overview, timeZone]);
 
   useEffect(() => {
-    if (activeView !== "home") {
+    if (activeView !== "water") {
       return;
     }
 
@@ -212,8 +225,10 @@ export default function App() {
   const activeItem = NAV_ITEMS.find((item) => item.view === activeView) ?? NAV_ITEMS[0]!;
   const activeTimeseries = timeseriesByBucket[bucket] ?? null;
   const shouldUseTimeseries = overview?.diagnostics.state === "ready";
-  const homeLoading = (overviewLoading && !overview) || (shouldUseTimeseries && timeseriesLoading && !activeTimeseries);
-  const homeError = overviewError ?? (shouldUseTimeseries ? timeseriesError : null);
+  const homeLoading = overviewLoading && !overview;
+  const homeError = overviewError;
+  const waterLoading = (overviewLoading && !overview) || (shouldUseTimeseries && timeseriesLoading && !activeTimeseries);
+  const waterError = overviewError ?? (shouldUseTimeseries ? timeseriesError : null);
   const methodologyViewLoading = (overviewLoading && !overview) || (methodologyLoading && !methodology);
   const methodologyViewError = overviewError ?? methodologyError;
 
@@ -262,9 +277,21 @@ export default function App() {
           <div className="px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
             {activeView === "home" ? (
               <HomeView
-                bucket={bucket}
                 error={homeError}
                 loading={homeLoading}
+                overview={overview}
+                timeZone={timeZone}
+                onOpenMethodology={() => {
+                  navigateTo("methodology");
+                }}
+              />
+            ) : null}
+
+            {activeView === "water" ? (
+              <WaterView
+                bucket={bucket}
+                error={waterError}
+                loading={waterLoading}
                 overview={overview}
                 timeseries={activeTimeseries}
                 timeZone={timeZone}
@@ -279,18 +306,26 @@ export default function App() {
               />
             ) : null}
 
-            {activeView === "usage-over-time" ? (
+            {activeView === "prompts" ? (
               <PlaceholderView
-                eyebrow="Usage over time"
-                title="Dedicated timeline view coming soon"
+                eyebrow="Prompts"
+                title="Prompt insights are coming next"
                 description={activeItem.description}
               />
             ) : null}
 
-            {activeView === "prompts" ? (
+            {activeView === "energy" ? (
               <PlaceholderView
-                eyebrow="Prompts"
-                title="Prompt-level water analysis coming soon"
+                eyebrow="Energy"
+                title="Energy estimates are on the roadmap"
+                description={activeItem.description}
+              />
+            ) : null}
+
+            {activeView === "co2" ? (
+              <PlaceholderView
+                eyebrow="CO2"
+                title="CO2 estimates are on the roadmap"
                 description={activeItem.description}
               />
             ) : null}
