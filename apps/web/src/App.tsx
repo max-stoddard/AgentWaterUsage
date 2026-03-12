@@ -11,7 +11,7 @@ type AppView = "home" | "prompts" | "water" | "energy" | "co2" | "methodology";
 
 function LocalBanner() {
   return (
-    <div className="mb-2 flex items-center justify-center gap-1.5 py-1.5 text-xs text-stone-400">
+    <div className="mb-2 flex items-center justify-center gap-1.5 py-1.5 text-xs text-zinc-400">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
         <path
           fillRule="evenodd"
@@ -252,7 +252,7 @@ export default function App() {
       <div className="mx-auto max-w-7xl">
         <LocalBanner />
         <div className="app-frame">
-          <header className="border-b border-stone-200 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+          <header className="border-b border-zinc-200 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <a
                 href="#home"
@@ -263,12 +263,12 @@ export default function App() {
                 }}
               >
                 <span className="brand-mark-shell">
-                  <AgentMark className="h-7 w-7" />
+                  <AgentMark className="h-6 w-6" />
                 </span>
-                <span className="text-lg font-semibold tracking-[-0.04em] text-stone-950 sm:text-xl">Agentic Insights</span>
+                <span className="text-base font-semibold tracking-[-0.04em] text-zinc-900">Agentic Insights</span>
               </a>
 
-              <nav aria-label="Primary" className="flex flex-wrap gap-2 lg:justify-end">
+              <nav aria-label="Primary" className="flex flex-wrap gap-1 lg:justify-end">
                 {NAV_ITEMS.map((item) => {
                   const isActive = item.view === activeView;
                   return (
@@ -276,7 +276,7 @@ export default function App() {
                       key={item.view}
                       href={item.hash}
                       aria-current={isActive ? "page" : undefined}
-                      className={isActive ? "nav-link nav-link-active" : "nav-link"}
+                      className={isActive ? "nav-link nav-link-active border-b-2 border-cyan-500" : "nav-link"}
                       onClick={(event) => {
                         event.preventDefault();
                         navigateTo(item.view);

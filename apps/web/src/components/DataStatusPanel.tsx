@@ -30,16 +30,16 @@ export function DataStatusPanel({ diagnostics }: DataStatusPanelProps) {
       <div className="max-w-3xl">
         <div className="micro-pill">{isNoData ? "Waiting for local history" : "Local read issue"}</div>
         <h2 className="mt-4 section-heading">{title}</h2>
-        <p className="mt-4 text-base leading-7 text-stone-600">{copy}</p>
+        <p className="mt-4 text-base leading-7 text-zinc-500">{copy}</p>
       </div>
 
       <div className="mt-6 panel-muted p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Current data path</p>
-        <code className="mt-3 block overflow-x-auto text-sm text-stone-800">{diagnostics.codexHome}</code>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Current data path</p>
+        <code className="mt-3 block overflow-x-auto text-sm text-zinc-800">{diagnostics.codexHome}</code>
       </div>
 
       {message ? (
-        <div className="mt-4 rounded-[20px] border border-stone-200 bg-stone-50 px-4 py-4 text-sm leading-6 text-stone-700">
+        <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm leading-6 text-zinc-700">
           {message}
         </div>
       ) : null}

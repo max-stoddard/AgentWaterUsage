@@ -9,3 +9,4 @@
   - You must ensure Windows/Linux/MacOS compatibility
 - Root level `README.md` is developer facing on GitHub, keep this in mind when editing it.
 - Lanaguage on the website should be friendly, easy to understand, concise and high level.
+- Do not commit co authored with yourself.

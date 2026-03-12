@@ -31,37 +31,25 @@ export function MetricCard({
   return (
     <article
       className={joinClasses(
-        "flex h-full flex-col rounded-[24px] border px-5 py-5 shadow-[0_14px_36px_-28px_rgba(28,25,23,0.18)] sm:px-6 sm:py-6",
+        "flex h-full flex-col rounded-lg border px-5 py-5 sm:px-6 sm:py-6",
         featured
-          ? "border-stone-900 bg-stone-950 text-stone-50"
-          : "border-stone-200 bg-white text-stone-950",
+          ? "border-zinc-800 bg-zinc-900 text-zinc-50"
+          : "border-zinc-200 bg-white text-zinc-900",
         className
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p
-            className={joinClasses(
-              "text-[0.68rem] font-semibold uppercase tracking-[0.22em]",
-              featured ? "text-cyan-200" : "text-stone-500"
-            )}
-          >
-            {eyebrow}
-          </p>
-          <p className={joinClasses("mt-3 text-base font-medium", featured ? "text-stone-300" : "text-stone-700")}>
-            {title}
-          </p>
-        </div>
-        <div
+      <div>
+        <p
           className={joinClasses(
-            "rounded-2xl border px-3 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.24em]",
-            featured
-              ? "border-white/10 bg-white/5 text-cyan-200"
-              : "border-stone-200 bg-stone-50 text-stone-500"
+            "text-[0.68rem] font-semibold uppercase tracking-[0.22em]",
+            featured ? "text-cyan-200" : "text-zinc-500"
           )}
         >
-          {featured ? "Primary" : "Snapshot"}
-        </div>
+          {eyebrow}
+        </p>
+        <p className={joinClasses("mt-3 text-base font-medium", featured ? "text-zinc-300" : "text-zinc-700")}>
+          {title}
+        </p>
       </div>
 
       <p
@@ -70,19 +58,19 @@ export function MetricCard({
           featured
             ? "text-4xl text-white sm:text-5xl"
             : compact
-              ? "text-[1.9rem] text-stone-950"
-              : "text-[2.2rem] text-stone-950 sm:text-4xl"
+              ? "text-[1.9rem] text-zinc-900"
+              : "text-[2.2rem] text-zinc-900 sm:text-4xl"
         )}
       >
         {value}
       </p>
-      <p className={joinClasses("mt-4 text-sm leading-6", featured ? "text-stone-300" : "text-stone-600")}>{detail}</p>
+      <p className={joinClasses("mt-4 text-sm leading-6", featured ? "text-zinc-300" : "text-zinc-600")}>{detail}</p>
 
       {footer ? (
         <div
           className={joinClasses(
             "mt-auto pt-6 text-sm",
-            featured ? "border-t border-white/10 text-stone-400" : "border-t border-stone-200 text-stone-600"
+            featured ? "border-t border-white/10 text-zinc-400" : "border-t border-zinc-200 text-zinc-600"
           )}
         >
           {footer}

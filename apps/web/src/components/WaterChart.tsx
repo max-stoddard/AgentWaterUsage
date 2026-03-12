@@ -106,42 +106,42 @@ export function WaterChart({ points }: WaterChartProps) {
       {latestPoint ? (
         <div className="mb-4 grid gap-3 sm:grid-cols-3">
           <div className="panel-muted p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Latest central</p>
-            <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-stone-950">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Latest central</p>
+            <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-zinc-900">
               {formatLitres(latestPoint.central)}
             </p>
           </div>
           <div className="panel-muted p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Current range</p>
-            <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-stone-950">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Current range</p>
+            <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-zinc-900">
               {formatLitres(latestPoint.low)} to {formatLitres(latestPoint.high)}
             </p>
           </div>
           <div className="panel-muted p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Latest tokens</p>
-            <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-stone-950">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Latest tokens</p>
+            <p className="mt-2 text-xl font-semibold tracking-[-0.04em] text-zinc-900">
               {formatNumber(latestPoint.tokens)}
             </p>
           </div>
         </div>
       ) : null}
 
-      <div className="rounded-[24px] border border-stone-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(247,247,245,0.98))] p-4 sm:p-6">
+      <div className="rounded-lg border border-zinc-200 bg-white p-4 sm:p-6">
         {activePoint ? (
-          <div className="flex flex-col gap-3 border-b border-stone-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-zinc-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">{activePoint.label}</p>
-              <p className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-stone-950">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{activePoint.label}</p>
+              <p className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-zinc-900">
                 {formatLitres(activePoint.central)}
               </p>
-              <p className="mt-1 text-sm leading-6 text-stone-600">
+              <p className="mt-1 text-sm leading-6 text-zinc-500">
                 Range {formatLitres(activePoint.low)} to {formatLitres(activePoint.high)}
               </p>
             </div>
-            <div className="text-sm leading-6 text-stone-600">
+            <div className="text-sm leading-6 text-zinc-600">
               <p>{formatNumber(activePoint.tokens)} tokens</p>
               {(activePoint.excludedTokens > 0 || activePoint.unestimatedTokens > 0) && (
-                <p className="text-stone-500">
+                <p className="text-zinc-500">
                   {activePoint.excludedTokens > 0 ? `${formatNumber(activePoint.excludedTokens)} excluded` : ""}
                   {activePoint.excludedTokens > 0 && activePoint.unestimatedTokens > 0 ? " · " : ""}
                   {activePoint.unestimatedTokens > 0 ? `${formatNumber(activePoint.unestimatedTokens)} unestimated` : ""}
@@ -154,7 +154,7 @@ export function WaterChart({ points }: WaterChartProps) {
         {chartPoints.length > 0 ? (
           <>
             <div
-              className="relative mt-5 h-72 rounded-[20px] border border-stone-200 bg-white"
+              className="relative mt-5 h-72 rounded-lg border border-zinc-200 bg-white"
               onMouseLeave={() => {
                 setActiveIndex(chartPoints.length - 1);
               }}
@@ -172,7 +172,7 @@ export function WaterChart({ points }: WaterChartProps) {
                     y1={lineY}
                     x2={CHART_WIDTH - CHART_PADDING_X}
                     y2={lineY}
-                    stroke="rgb(231 229 228)"
+                    stroke="rgb(228 228 231)"
                     strokeWidth="0.5"
                   />
                 ))}
@@ -222,20 +222,20 @@ export function WaterChart({ points }: WaterChartProps) {
               ))}
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-stone-500">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-zinc-500">
               {axisLabels.map((label) => (
                 <span key={label}>{label}</span>
               ))}
             </div>
           </>
         ) : (
-          <div className="mt-5 rounded-[20px] border border-dashed border-stone-300 bg-white px-4 py-10 text-sm leading-6 text-stone-600">
+          <div className="mt-5 rounded-lg border border-dashed border-zinc-300 bg-white px-4 py-10 text-sm leading-6 text-zinc-500">
             No water estimate available for this bucket.
           </div>
         )}
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-stone-600">
+      <p className="mt-4 text-sm leading-6 text-zinc-500">
         The chart keeps the central estimate prominent while preserving the low-to-high range and non-estimated token counts
         on every point.
       </p>

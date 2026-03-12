@@ -16,18 +16,18 @@ export function MethodologyPanel({ methodology }: MethodologyPanelProps) {
       </p>
 
       <div className="mt-8 grid gap-3">
-        <code className="overflow-x-auto rounded-[24px] border border-stone-800 bg-stone-950 px-4 py-4 text-xs leading-6 text-stone-100">
+        <code className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-4 text-xs leading-6 text-zinc-100">
           eventCostUsd = input/1e6 * inputPrice + cachedInput/1e6 * cachedInputPrice + output/1e6 * outputPrice
         </code>
-        <code className="overflow-x-auto rounded-[24px] border border-stone-200 bg-stone-50 px-4 py-4 text-xs leading-6 text-stone-700">
+        <code className="overflow-x-auto rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-4 text-xs leading-6 text-zinc-700">
           waterLitres = eventCostUsd / referenceEventCostUsd * benchmarkCoefficient
         </code>
       </div>
 
       <div className="mt-8 grid gap-3 lg:grid-cols-2">
         <div className="panel-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Benchmark coefficients</p>
-          <p className="mt-2 text-sm leading-6 text-stone-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Benchmark coefficients</p>
+          <p className="mt-2 text-sm leading-6 text-zinc-700">
             Low {formatLitres(methodology.benchmarkCoefficients.low)} · Central{" "}
             {formatLitres(methodology.benchmarkCoefficients.central)} · High{" "}
             {formatLitres(methodology.benchmarkCoefficients.high)}
@@ -35,24 +35,24 @@ export function MethodologyPanel({ methodology }: MethodologyPanelProps) {
         </div>
 
         <div className="panel-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Calibration snapshot</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Calibration snapshot</p>
           {methodology.calibration ? (
-            <p className="mt-2 text-sm leading-6 text-stone-700">
+            <p className="mt-2 text-sm leading-6 text-zinc-700">
               Median supported event cost: {methodology.calibration.referenceEventCostUsd.toFixed(6)} USD-equivalent across{" "}
               {formatNumber(methodology.calibration.supportedEventCount)} supported events.
             </p>
           ) : (
-            <p className="mt-2 text-sm leading-6 text-stone-700">
+            <p className="mt-2 text-sm leading-6 text-zinc-700">
               No supported events were available to compute a local calibration median.
             </p>
           )}
         </div>
       </div>
 
-      <div className="mt-8 overflow-hidden rounded-[24px] border border-stone-200 bg-white">
+      <div className="mt-8 overflow-hidden rounded-lg border border-zinc-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse text-left text-sm text-stone-700">
-            <thead className="bg-stone-50/80 text-xs uppercase tracking-[0.18em] text-stone-500">
+          <table className="min-w-full border-collapse text-left text-sm text-zinc-700">
+            <thead className="bg-zinc-50/80 text-xs uppercase tracking-[0.18em] text-zinc-500">
               <tr>
                 <th className="px-4 py-3 font-semibold">model</th>
                 <th className="px-4 py-3 font-semibold">input / 1M</th>
@@ -62,8 +62,8 @@ export function MethodologyPanel({ methodology }: MethodologyPanelProps) {
             </thead>
             <tbody>
               {methodology.pricingTable.map((entry) => (
-                <tr key={entry.model} className="border-t border-stone-200">
-                  <td className="px-4 py-3 font-medium text-stone-900">{entry.model}</td>
+                <tr key={entry.model} className="border-t border-zinc-200">
+                  <td className="px-4 py-3 font-medium text-zinc-900">{entry.model}</td>
                   <td className="px-4 py-3">${entry.inputUsdPerMillion}</td>
                   <td className="px-4 py-3">${entry.cachedInputUsdPerMillion}</td>
                   <td className="px-4 py-3">${entry.outputUsdPerMillion}</td>
@@ -81,7 +81,7 @@ export function MethodologyPanel({ methodology }: MethodologyPanelProps) {
             href={link.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm text-stone-700 no-underline transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"
+            className="inline-flex items-center rounded-md bg-zinc-100 px-3 py-1.5 text-sm text-zinc-700 no-underline transition-colors hover:bg-cyan-50 hover:text-cyan-800"
           >
             {link.label}
           </a>

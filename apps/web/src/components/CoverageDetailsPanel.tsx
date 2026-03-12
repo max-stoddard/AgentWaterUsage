@@ -25,25 +25,25 @@ export function CoverageDetailsPanel({ overview }: CoverageDetailsPanelProps) {
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <div className="panel-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Supported events</p>
-          <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.05em] text-stone-950">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Supported events</p>
+          <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.05em] text-zinc-900">
             {formatNumber(overview.coverage.supportedEvents)}
           </p>
-          <p className="mt-1 text-sm text-stone-600">priced and estimated</p>
+          <p className="mt-1 text-sm text-zinc-500">priced and estimated</p>
         </div>
         <div className="panel-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Excluded events</p>
-          <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.05em] text-stone-950">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Excluded events</p>
+          <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.05em] text-zinc-900">
             {formatNumber(overview.coverage.excludedEvents)}
           </p>
-          <p className="mt-1 text-sm text-stone-600">outside supported pricing coverage</p>
+          <p className="mt-1 text-sm text-zinc-500">outside supported pricing coverage</p>
         </div>
         <div className="panel-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Token-only events</p>
-          <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.05em] text-stone-950">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Token-only events</p>
+          <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.05em] text-zinc-900">
             {formatNumber(overview.coverage.tokenOnlyEvents)}
           </p>
-          <p className="mt-1 text-sm text-stone-600">recovered without split-token data</p>
+          <p className="mt-1 text-sm text-zinc-500">recovered without split-token data</p>
         </div>
       </div>
 
@@ -54,10 +54,10 @@ export function CoverageDetailsPanel({ overview }: CoverageDetailsPanelProps) {
               <div className="flex items-start gap-4">
                 <div className="mt-1 h-10 w-1 rounded-full bg-cyan-400" />
                 <div>
-                  <p className="text-sm font-semibold text-stone-950">
+                  <p className="text-sm font-semibold text-zinc-900">
                     {item.provider} / {item.model}
                   </p>
-                  <p className="mt-1 text-sm leading-6 text-stone-600">
+                  <p className="mt-1 text-sm leading-6 text-zinc-500">
                     {formatNumber(item.tokens)} tokens excluded because {item.reason.toLowerCase()}.
                   </p>
                 </div>
@@ -67,10 +67,10 @@ export function CoverageDetailsPanel({ overview }: CoverageDetailsPanelProps) {
           {overview.tokenTotals.unestimatedTokens > 0 ? (
             <div className="panel-muted px-4 py-4">
               <div className="flex items-start gap-4">
-                <div className="mt-1 h-10 w-1 rounded-full bg-stone-300" />
+                <div className="mt-1 h-10 w-1 rounded-full bg-zinc-300" />
                 <div>
-                  <p className="text-sm font-semibold text-stone-950">Fallback-only sessions</p>
-                  <p className="mt-1 text-sm leading-6 text-stone-600">
+                  <p className="text-sm font-semibold text-zinc-900">Fallback-only sessions</p>
+                  <p className="mt-1 text-sm leading-6 text-zinc-500">
                     {formatNumber(overview.tokenTotals.unestimatedTokens)} tokens were recovered from TUI totals without split
                     token data, so they remain unestimated.
                   </p>
@@ -80,7 +80,7 @@ export function CoverageDetailsPanel({ overview }: CoverageDetailsPanelProps) {
           ) : null}
         </div>
       ) : (
-        <div className="mt-6 rounded-[20px] border border-cyan-100 bg-cyan-50 px-4 py-4 text-sm leading-6 text-stone-700">
+        <div className="mt-6 rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-4 text-sm leading-6 text-zinc-700">
           Everything parsed so far has pricing coverage and split-token data.
         </div>
       )}

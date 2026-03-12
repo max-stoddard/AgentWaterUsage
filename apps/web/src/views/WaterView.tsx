@@ -47,12 +47,11 @@ export function WaterView({
   return (
     <div className="flex flex-col gap-4 lg:gap-5">
       <section className="panel-shell relative overflow-hidden px-6 py-6 sm:px-8 sm:py-8">
-        <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.12),transparent_58%)]" />
-        <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
           <div className="max-w-3xl">
             <div className="micro-pill">Water</div>
-            <h1 className="mt-6 text-4xl font-semibold tracking-[-0.06em] text-stone-950 sm:text-5xl">Track your water estimate</h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-stone-600">
+            <h1 className="mt-6 text-2xl font-semibold tracking-[-0.06em] text-zinc-900 sm:text-3xl">Track your water estimate</h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-500">
               This view keeps the current water estimate, range, and trend in one place while leaving unsupported and
               unestimated activity visible.
             </p>
@@ -60,7 +59,7 @@ export function WaterView({
 
           <div className="panel-muted p-5">
             <p className="section-kicker">Estimate basis</p>
-            <div className="mt-4 space-y-3 text-sm leading-6 text-stone-600">
+            <div className="mt-4 space-y-3 text-sm leading-6 text-zinc-500">
               <p>Water is inferred from supported token activity and pricing-weighted normalization.</p>
               <p>Low, central, and high ranges stay available on every trend point.</p>
               <p>Methodology remains available without leaving the dashboard flow.</p>
