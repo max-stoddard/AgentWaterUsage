@@ -3,6 +3,7 @@ import { AlertBanner } from "../components/AlertBanner";
 import { BucketToggle } from "../components/BucketToggle";
 import { CoverageSummary } from "../components/CoverageSummary";
 import { DataStatusPanel } from "../components/DataStatusPanel";
+import { HeroBanner } from "../components/HeroBanner";
 import { MetricCard } from "../components/MetricCard";
 import { RoadmapStrip } from "../components/RoadmapStrip";
 import { SkeletonBlock } from "../components/SkeletonBlock";
@@ -53,13 +54,15 @@ export function DashboardView({
         <DataStatusPanel diagnostics={overview.diagnostics} />
       ) : showData ? (
         <>
+          <HeroBanner />
+
           <MetricCard
             eyebrow="Water used"
             title="Estimated from your local coding agent activity"
             value={formatLitres(overview.waterLitres.central)}
             detail={`Between ${formatLitres(overview.waterLitres.low)} and ${formatLitres(overview.waterLitres.high)}`}
             footer={
-              <span>From {formatNumber(overview.coverage.supportedEvents)} coding sessions</span>
+              <span>Based on {formatNumber(overview.coverage.supportedEvents)} supported usage events</span>
             }
             aside={
               <span className="pill">

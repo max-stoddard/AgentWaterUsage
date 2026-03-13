@@ -26,6 +26,49 @@ function mockDashboardResponses() {
             excludedEvents: 1,
             tokenOnlyEvents: 1
           },
+          coverageSummary: {
+            sessions: 12,
+            prompts: 47,
+            excludedModels: 2
+          },
+          coverageDetails: [
+            {
+              provider: "openai",
+              model: "gpt-5.4",
+              source: "VS Code extension",
+              tokens: 900,
+              events: 9,
+              classification: "supported",
+              reason: null
+            },
+            {
+              provider: "anthropic",
+              model: "claude-sonnet-4-20250514",
+              source: "Claude Code",
+              tokens: 120,
+              events: 3,
+              classification: "supported",
+              reason: null
+            },
+            {
+              provider: "ollama",
+              model: "qwen3.5:9b",
+              source: "CLI",
+              tokens: 50,
+              events: 1,
+              classification: "excluded",
+              reason: "Unsupported provider: ollama"
+            },
+            {
+              provider: "openai",
+              model: "gpt-5.4",
+              source: "CLI",
+              tokens: 50,
+              events: 1,
+              classification: "token_only",
+              reason: "Token totals are available, but token splits needed for pricing-weighted estimation are missing."
+            }
+          ],
           diagnostics: {
             state: "ready",
             codexHome: "/tmp/.codex",
@@ -35,6 +78,7 @@ function mockDashboardResponses() {
             {
               provider: "ollama",
               model: "qwen3.5:9b",
+              source: "CLI",
               tokens: 50,
               events: 1,
               reason: "Unsupported provider: ollama"
@@ -58,11 +102,19 @@ function mockDashboardResponses() {
           pricingTable: [
             {
               provider: "openai",
-              model: "gpt-5.3-codex",
+              model: "gpt-5.2-codex",
               inputUsdPerMillion: 1.75,
               cachedInputUsdPerMillion: 0.175,
               outputUsdPerMillion: 14,
-              docsUrl: "https://developers.openai.com/api/docs/models/gpt-5.3-codex"
+              docsUrl: "https://openai.com/api/pricing/"
+            },
+            {
+              provider: "anthropic",
+              model: "claude-sonnet-4",
+              inputUsdPerMillion: 3,
+              cachedInputUsdPerMillion: 0.3,
+              outputUsdPerMillion: 15,
+              docsUrl: "https://docs.anthropic.com/en/docs/about-claude/pricing"
             }
           ],
           benchmarkCoefficients: {
@@ -86,7 +138,8 @@ function mockDashboardResponses() {
               label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
               url: "https://arxiv.org/abs/2304.03271"
             },
-            { label: "OpenAI API pricing", url: "https://openai.com/api/pricing/" }
+            { label: "OpenAI API pricing", url: "https://openai.com/api/pricing/" },
+            { label: "Anthropic API pricing", url: "https://docs.anthropic.com/en/docs/about-claude/pricing" }
           ]
         }),
         { status: 200 }
@@ -99,6 +152,7 @@ function mockDashboardResponses() {
           bucket: "day",
           points: [
             {
+              startTs: Date.parse("2026-03-09T00:00:00.000Z"),
               key: "2026-03-09",
               label: "9 Mar 2026",
               tokens: 1000,
@@ -122,6 +176,7 @@ function mockDashboardResponses() {
           bucket: "week",
           points: [
             {
+              startTs: Date.parse("2026-03-09T00:00:00.000Z"),
               key: "2026-W11",
               label: "Week of 9 Mar 2026",
               tokens: 2000,
@@ -142,7 +197,47 @@ function mockDashboardResponses() {
     return new Response(
       JSON.stringify({
         bucket: "month",
-        points: []
+        points: [
+          {
+            startTs: Date.parse("2026-01-01T00:00:00.000Z"),
+            key: "2026-01",
+            label: "Jan 2026",
+            tokens: 600,
+            excludedTokens: 0,
+            unestimatedTokens: 0,
+            waterLitres: {
+              low: 0.2,
+              central: 0.6,
+              high: 0.9
+            }
+          },
+          {
+            startTs: Date.parse("2026-02-01T00:00:00.000Z"),
+            key: "2026-02",
+            label: "Feb 2026",
+            tokens: 0,
+            excludedTokens: 0,
+            unestimatedTokens: 0,
+            waterLitres: {
+              low: 0,
+              central: 0,
+              high: 0
+            }
+          },
+          {
+            startTs: Date.parse("2026-03-01T00:00:00.000Z"),
+            key: "2026-03",
+            label: "Mar 2026",
+            tokens: 400,
+            excludedTokens: 50,
+            unestimatedTokens: 50,
+            waterLitres: {
+              low: 0.3,
+              central: 0.6,
+              high: 1.2
+            }
+          }
+        ]
       }),
       { status: 200 }
     );
@@ -172,15 +267,23 @@ describe("App", () => {
     });
 
     expect(screen.getByText(/Water used/i)).toBeInTheDocument();
+    expect(screen.getByText(/Understand your agent/i)).toBeInTheDocument();
+    expect(screen.getByText(/footprint locally\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/Local coding agent insights/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Between 500.0 mL and 2.10 L/i)).toBeInTheDocument();
-    expect(screen.getByText(/From 9 coding sessions/i)).toBeInTheDocument();
+    expect(screen.getByText(/Based on 9 supported usage events/i)).toBeInTheDocument();
     expect(screen.getByText(/90% coverage/i)).toBeInTheDocument();
 
     expect(screen.getByText(/Usage over time/i)).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Day" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByTestId("water-chart")).toBeInTheDocument();
 
-    expect(screen.getByText("supported")).toBeInTheDocument();
-    expect(screen.getByText("excluded")).toBeInTheDocument();
+    const breakdownHeading = screen.getByText("Usage breakdown");
+    const breakdownSection = breakdownHeading.closest("section");
+    expect(breakdownSection).not.toBeNull();
+    expect(screen.getByText("sessions")).toBeInTheDocument();
+    expect(screen.getByText("prompts")).toBeInTheDocument();
+    expect(breakdownSection).toHaveTextContent("tokens");
 
     expect(screen.getByText(/Prompt insights/i)).toBeInTheDocument();
     expect(screen.getByText(/Energy estimates/i)).toBeInTheDocument();
@@ -194,7 +297,7 @@ describe("App", () => {
   it("switches time bucket via the toggle and fetches new timeseries", async () => {
     mockDashboardResponses();
 
-    render(<App />);
+    const { container } = render(<App />);
 
     await waitFor(() => {
       expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
@@ -216,7 +319,33 @@ describe("App", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("bucket=month"));
     });
-    expect(await screen.findByText("No water estimate available for this time range.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(container.querySelectorAll(".recharts-bar-rectangle").length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  it("shows tooltip details when a bucket bar is hovered", async () => {
+    mockDashboardResponses();
+
+    const { container } = render(<App />);
+
+    const chart = await screen.findByTestId("water-chart");
+
+    expect(chart).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(container.querySelector(".recharts-wrapper")).not.toBeNull();
+    });
+
+    const chartWrapper = container.querySelector(".recharts-wrapper");
+    fireEvent.mouseMove(chartWrapper as Element, {
+      clientX: 512,
+      clientY: 140
+    });
+
+    expect(await screen.findByTestId("water-chart-tooltip")).toBeInTheDocument();
+    expect(screen.getByText("9 Mar 2026")).toBeInTheDocument();
+    expect(screen.getByText("1,000 tokens")).toBeInTheDocument();
   });
 
   it("opens the methodology drawer and shows pricing and sources", async () => {
@@ -236,10 +365,54 @@ describe("App", () => {
       expect(fetchMock).toHaveBeenCalledWith("/api/methodology");
     });
 
-    expect(await screen.findByText(/gpt-5.3-codex/i)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Prompts" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Water" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Energy" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Carbon" })).toBeInTheDocument();
+    expect(screen.getByText(/Sessions are distinct Codex and Claude Code runs/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Energy" }));
+    expect(screen.getByText(/Energy estimates are not live yet/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Carbon" }));
+    expect(screen.getByText(/Carbon estimates are also still upcoming/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Water" }));
+
+    expect(await screen.findByText(/gpt-5.2-codex/i)).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /CACM DOI: Making AI Less 'Thirsty' \(Li, Yang, Islam, Ren\)/i })
     ).toHaveAttribute("href", "https://doi.org/10.1145/3724499");
+  });
+
+  it("shows per-model coverage details with sources in the expanded summary", async () => {
+    mockDashboardResponses();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getByText("Usage breakdown")).toBeInTheDocument();
+    expect(screen.getByText("See how many prompts and sessions were counted, how many tokens are included in the estimate, and which model sources are driving the total.")).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.getByText("47")).toBeInTheDocument();
+    expect(screen.getByText("900")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Show all model sources/i }));
+
+    expect(screen.getAllByText("openai / gpt-5.4")).toHaveLength(2);
+    expect(screen.getByText("anthropic / claude-sonnet-4-20250514")).toBeInTheDocument();
+    expect(screen.getByText("Claude Code · 120 tokens")).toBeInTheDocument();
+    expect(screen.getByText("VS Code extension · 900 tokens")).toBeInTheDocument();
+    expect(screen.getByText("CLI · 50 tokens — unsupported provider: ollama")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "CLI · 50 tokens — token totals are available, but token splits needed for pricing-weighted estimation are missing."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Show fewer sources/i })).toBeInTheDocument();
   });
 
   it("shows neutral onboarding guidance when no local usage history is available", async () => {
@@ -264,6 +437,12 @@ describe("App", () => {
               excludedEvents: 0,
               tokenOnlyEvents: 0
             },
+            coverageSummary: {
+              sessions: 0,
+              prompts: 0,
+              excludedModels: 0
+            },
+            coverageDetails: [],
             diagnostics: {
               state: "no_data",
               codexHome: "/home/dev/.codex",
@@ -311,6 +490,12 @@ describe("App", () => {
               excludedEvents: 0,
               tokenOnlyEvents: 0
             },
+            coverageSummary: {
+              sessions: 0,
+              prompts: 0,
+              excludedModels: 0
+            },
+            coverageDetails: [],
             diagnostics: {
               state: "read_error",
               codexHome: "/bad/path/.codex",
