@@ -1,4 +1,11 @@
-import type { MethodologySourceLink, MethodologyTabId, PricingCatalogMetadata, PricingEntry, WaterRange } from "@agentic-insights/shared";
+import {
+  WATER_SCALE_COMPARISONS,
+  type MethodologySourceLink,
+  type MethodologyTabId,
+  type PricingCatalogMetadata,
+  type PricingEntry,
+  type WaterRange
+} from "@agentic-insights/shared";
 import { GENERATED_PRICING_CATALOG } from "./generated/pricing-catalog.js";
 
 export const BENCHMARK_COEFFICIENTS: WaterRange = {
@@ -15,7 +22,11 @@ const WATER_PAPER_SOURCES: MethodologySourceLink[] = [
   {
     label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
     url: "https://arxiv.org/abs/2304.03271"
-  }
+  },
+  ...WATER_SCALE_COMPARISONS.map((comparison) => ({
+    label: comparison.sourceLabel,
+    url: comparison.sourceUrl
+  }))
 ];
 
 const ENERGY_SOURCES: MethodologySourceLink[] = [

@@ -307,10 +307,38 @@ describe("API routes", () => {
     );
     expect(methodology.sourcesByTab.water).toEqual(
       expect.arrayContaining([
+        {
+          label: "NIST Metric Kitchen: Cooking Measurement Equivalencies",
+          url: "https://www.nist.gov/pml/owm/metric-kitchen-cooking-measurement-equivalencies"
+        },
+        {
+          label: "EFSA Dietary Reference Values for Water",
+          url: "https://www.efsa.europa.eu/en/efsajournal/pub/1459"
+        },
         { label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)", url: "https://doi.org/10.1145/3724499" },
         {
           label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
           url: "https://arxiv.org/abs/2304.03271"
+        },
+        {
+          label: "Ecological Economics DOI: The water footprint of coffee and tea consumption in the Netherlands",
+          url: "https://doi.org/10.1016/j.ecolecon.2007.02.022"
+        },
+        {
+          label: "Ecological Indicators DOI: Water footprint of soy milk and soy burger and equivalent animal products",
+          url: "https://doi.org/10.1016/j.ecolind.2011.12.009"
+        },
+        {
+          label: "Sustainability Science DOI: Comparing ecological and water footprint of denim jeans and a tri-blend T-shirt",
+          url: "https://doi.org/10.1007/s11625-022-01131-0"
+        },
+        {
+          label: "Environmental Science & Technology DOI: Water Footprint of European Cars: Potential Impacts of Water Consumption along Automobile Life Cycles",
+          url: "https://doi.org/10.1021/es2040043"
+        },
+        {
+          label: "GCSAA Golf Course Environmental Profile: Phase II Water Use and Conservation Practices on U.S. Golf Courses",
+          url: "https://www.gcsaa.org/docs/default-source/Environment/phase-2-water-use-survey-full-report.pdf?sfvrsn=2b39123e_4"
         }
       ])
     );
