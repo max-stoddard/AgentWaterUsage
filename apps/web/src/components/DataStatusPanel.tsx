@@ -39,7 +39,7 @@ export function DataStatusPanel({ diagnostics }: DataStatusPanelProps) {
       </div>
 
       <div className="mt-5 rounded-lg bg-surface-muted p-4">
-        <p className="text-xs font-medium text-ink-tertiary">Current data path</p>
+        <p className="text-xs font-medium text-ink-tertiary">Current data paths</p>
         <code className="mt-2 block overflow-x-auto text-sm text-ink">{diagnostics.codexHome}</code>
       </div>
 

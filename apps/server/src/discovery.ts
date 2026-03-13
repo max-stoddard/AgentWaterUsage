@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { FileRecord } from "./types.js";
 
-function walkJsonlFiles(dirPath: string, output: FileRecord[]): void {
+function walkFiles(dirPath: string, extension: ".json" | ".jsonl", output: FileRecord[]): void {
   if (!fs.existsSync(dirPath)) {
     return;
   }
@@ -10,11 +10,11 @@ function walkJsonlFiles(dirPath: string, output: FileRecord[]): void {
   for (const dirent of fs.readdirSync(dirPath, { withFileTypes: true })) {
     const fullPath = path.join(dirPath, dirent.name);
     if (dirent.isDirectory()) {
-      walkJsonlFiles(fullPath, output);
+      walkFiles(fullPath, extension, output);
       continue;
     }
 
-    if (!dirent.isFile() || !fullPath.endsWith(".jsonl")) {
+    if (!dirent.isFile() || !fullPath.endsWith(extension)) {
       continue;
     }
 
@@ -29,8 +29,20 @@ function walkJsonlFiles(dirPath: string, output: FileRecord[]): void {
 
 export function listSessionFiles(codexHome: string): FileRecord[] {
   const files: FileRecord[] = [];
-  walkJsonlFiles(path.join(codexHome, "sessions"), files);
-  walkJsonlFiles(path.join(codexHome, "archived_sessions"), files);
+  walkFiles(path.join(codexHome, "sessions"), ".jsonl", files);
+  walkFiles(path.join(codexHome, "archived_sessions"), ".jsonl", files);
+  return files.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+export function listClaudeProjectFiles(claudeHome: string): FileRecord[] {
+  const files: FileRecord[] = [];
+  walkFiles(path.join(claudeHome, "projects"), ".jsonl", files);
+  return files.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+export function listClaudeSessionMetaFiles(claudeHome: string): FileRecord[] {
+  const files: FileRecord[] = [];
+  walkFiles(path.join(claudeHome, "usage-data", "session-meta"), ".json", files);
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 

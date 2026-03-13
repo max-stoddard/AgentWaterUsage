@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { parseSessionFile, parseTuiFallback } from "../src/parser.js";
+import { parseSessionFile, parseSessionPrompts, parseTuiFallback } from "../src/parser.js";
 import { createCodexHome, writeJsonlFile, writeTuiLog } from "./helpers.js";
 
 const cleanups: Array<() => void> = [];
@@ -190,5 +190,59 @@ describe("parseSessionFile", () => {
     expect(events[0]?.totalTokens).toBe(120);
     expect(events[1]?.totalTokens).toBe(80);
     expect(events[0]?.inputTokens).toBeNull();
+  });
+
+  it("counts codex prompts from canonical user message events", () => {
+    const codex = createCodexHome();
+    cleanups.push(codex.cleanup);
+    const file = writeJsonlFile(codex.dir, "sessions/2026/03/09/rollout-prompts.jsonl", [
+      {
+        timestamp: "2026-03-09T10:00:00.000Z",
+        type: "session_meta",
+        payload: {
+          id: "session-prompts",
+          model_provider: "openai",
+          source: "vscode"
+        }
+      },
+      {
+        timestamp: "2026-03-09T10:00:01.000Z",
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "# AGENTS.md instructions for /tmp/demo" }]
+        }
+      },
+      {
+        timestamp: "2026-03-09T10:00:02.000Z",
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "Explain the result" }]
+        }
+      },
+      {
+        timestamp: "2026-03-09T10:00:02.000Z",
+        type: "event_msg",
+        payload: {
+          type: "user_message",
+          message: "Explain the result"
+        }
+      },
+      {
+        timestamp: "2026-03-09T10:00:03.000Z",
+        type: "event_msg",
+        payload: {
+          type: "user_message",
+          message: "Add a chart"
+        }
+      }
+    ]);
+
+    const prompts = parseSessionPrompts(file);
+    expect(prompts).toHaveLength(2);
+    expect(prompts[0]?.sessionId).toBe("session-prompts");
   });
 });

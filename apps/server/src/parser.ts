@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { RawUsageEvent } from "./types.js";
+import type { PromptRecord, RawUsageEvent } from "./types.js";
 
 interface ModelEvent {
   ts: number;
@@ -77,6 +77,35 @@ function nearestModel(models: ModelEvent[], ts: number): string {
 
 function makeEventId(parts: string[]): string {
   return crypto.createHash("sha1").update(parts.join("|")).digest("hex").slice(0, 16);
+}
+
+function makePromptId(parts: string[]): string {
+  return crypto.createHash("sha1").update(parts.join("|")).digest("hex").slice(0, 16);
+}
+
+function normalizePromptText(value: unknown): string | null {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text ? text : null;
+  }
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const text = value
+    .flatMap((item) => {
+      if (!item || typeof item !== "object") {
+        return [];
+      }
+
+      const record = item as { type?: unknown; text?: unknown };
+      return record.type === "input_text" && typeof record.text === "string" ? [record.text] : [];
+    })
+    .join("\n")
+    .trim();
+
+  return text ? text : null;
 }
 
 function buildEventsFromTokenCounts(
@@ -308,4 +337,78 @@ export function parseSessionFile(filePath: string, fallbackMap: TuiFallbackMap):
   }
 
   return buildEventsFromTuiFallback(sessionId, provider, source, models, fallbackMap.get(sessionId) ?? []);
+}
+
+export function parseSessionPrompts(filePath: string): PromptRecord[] {
+  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/).filter(Boolean);
+  let sessionId = filenameSessionId(filePath);
+  const responsePrompts: PromptRecord[] = [];
+  const eventPrompts: PromptRecord[] = [];
+
+  for (const line of lines) {
+    let row: {
+      timestamp?: unknown;
+      type?: string;
+      payload?: {
+        id?: string;
+        type?: string;
+        role?: string;
+        content?: unknown;
+        message?: string;
+      };
+    };
+
+    try {
+      row = JSON.parse(line) as typeof row;
+    } catch {
+      continue;
+    }
+
+    const ts = parseTimestamp(row.timestamp);
+    if (row.type === "session_meta" && typeof row.payload?.id === "string" && row.payload.id) {
+      sessionId = row.payload.id;
+      continue;
+    }
+
+    if (ts === null) {
+      continue;
+    }
+
+    if (row.type === "event_msg" && row.payload?.type === "user_message") {
+      const text = normalizePromptText(row.payload.message);
+      if (!text) {
+        continue;
+      }
+
+      eventPrompts.push({
+        id: makePromptId([sessionId, "event", String(ts), text]),
+        sessionId,
+        ts
+      });
+      continue;
+    }
+
+    if (row.type === "response_item" && row.payload?.type === "message" && row.payload.role === "user") {
+      const text = normalizePromptText(row.payload.content);
+      if (!text || text.startsWith("# AGENTS.md instructions for ") || text.startsWith("<environment_context>")) {
+        continue;
+      }
+
+      responsePrompts.push({
+        id: makePromptId([sessionId, "response", String(ts), text]),
+        sessionId,
+        ts
+      });
+    }
+  }
+
+  const prompts = eventPrompts.length > 0 ? eventPrompts : responsePrompts;
+  const deduped = new Map<string, PromptRecord>();
+  for (const prompt of prompts) {
+    if (!deduped.has(prompt.id)) {
+      deduped.set(prompt.id, prompt);
+    }
+  }
+
+  return [...deduped.values()].sort((a, b) => a.ts - b.ts);
 }

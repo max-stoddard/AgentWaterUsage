@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { createCacheDir, createCodexHome, writeJsonlFile, writeTuiLog } from "./helpers.js";
+import { createCacheDir, createClaudeHome, createCodexHome, writeJsonFile, writeJsonlFile, writeTuiLog } from "./helpers.js";
 
 let previousCodexHome: string | undefined;
 let previousCacheDir: string | undefined;
+let previousHome: string | undefined;
 
 beforeEach(() => {
   previousCodexHome = process.env.CODEX_HOME;
   previousCacheDir = process.env.AGENTIC_INSIGHTS_CACHE_DIR;
+  previousHome = process.env.HOME;
 });
 
 afterEach(() => {
@@ -22,13 +24,21 @@ afterEach(() => {
   } else {
     process.env.AGENTIC_INSIGHTS_CACHE_DIR = previousCacheDir;
   }
+
+  if (previousHome === undefined) {
+    delete process.env.HOME;
+  } else {
+    process.env.HOME = previousHome;
+  }
 });
 
 describe("API routes", () => {
   it("serves overview, timeseries, and methodology consistently", async () => {
     const codex = createCodexHome();
+    const claude = createClaudeHome();
     const cache = createCacheDir();
     process.env.CODEX_HOME = codex.dir;
+    process.env.HOME = claude.homeDir;
     process.env.AGENTIC_INSIGHTS_CACHE_DIR = cache.dir;
 
     const sessionId = "session-openai";
@@ -67,6 +77,14 @@ describe("API routes", () => {
               cached_input_tokens: 30
             }
           }
+        }
+      },
+      {
+        timestamp: "2026-03-09T10:00:03.000Z",
+        type: "event_msg",
+        payload: {
+          type: "user_message",
+          message: "Explain the estimate"
         }
       }
     ]);
@@ -111,6 +129,54 @@ describe("API routes", () => {
       }
     ]);
 
+    writeJsonlFile(claude.homeDir, ".claude/projects/project-a/rollout-claude.jsonl", [
+      {
+        type: "user",
+        uuid: "user-claude-1",
+        timestamp: "2026-03-09T10:09:59.000Z",
+        sessionId: "session-claude",
+        message: {
+          content: "Review the methodology"
+        }
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-03-09T10:10:00.000Z",
+        sessionId: "session-claude",
+        message: {
+          id: "msg-claude-1",
+          model: "claude-sonnet-4-20250514",
+          usage: {
+            input_tokens: 55,
+            cache_creation_input_tokens: 10,
+            cache_read_input_tokens: 10,
+            output_tokens: 15
+          }
+        }
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-03-09T10:10:01.000Z",
+        sessionId: "session-claude",
+        message: {
+          id: "msg-claude-1",
+          model: "claude-sonnet-4-20250514",
+          usage: {
+            input_tokens: 55,
+            cache_creation_input_tokens: 10,
+            cache_read_input_tokens: 10,
+            output_tokens: 15
+          }
+        }
+      }
+    ]);
+    writeJsonFile(claude.homeDir, ".claude/usage-data/session-meta/session-claude-fallback.json", {
+      session_id: "session-claude-fallback",
+      start_time: "2026-03-09T10:12:00.000Z",
+      input_tokens: 40,
+      output_tokens: 10
+    });
+
     writeJsonlFile(codex.dir, "sessions/2026/03/09/rollout-fallback.jsonl", [
       {
         timestamp: "2026-03-09T11:00:00.000Z",
@@ -127,10 +193,59 @@ describe("API routes", () => {
     const app = createApp();
     const overviewResponse = await app.inject({ method: "GET", url: "/api/overview" });
     const overview = overviewResponse.json();
-    expect(overview.tokenTotals.totalTokens).toBe(230);
-    expect(overview.tokenTotals.excludedTokens).toBe(50);
+    expect(overview.tokenTotals.totalTokens).toBe(360);
+    expect(overview.tokenTotals.supportedTokens).toBe(200);
+    expect(overview.tokenTotals.excludedTokens).toBe(100);
     expect(overview.tokenTotals.unestimatedTokens).toBe(60);
-    expect(overview.coverage.supportedEvents).toBe(1);
+    expect(overview.coverage.supportedEvents).toBe(2);
+    expect(overview.coverageSummary).toEqual({
+      sessions: 5,
+      prompts: 2,
+      excludedModels: 2
+    });
+    expect(overview.coverageDetails).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          provider: "openai",
+          model: "gpt-5.3-codex",
+          source: "VS Code extension",
+          classification: "supported",
+          tokens: 120
+        }),
+        expect.objectContaining({
+          provider: "anthropic",
+          model: "claude-sonnet-4-20250514",
+          source: "Claude Code",
+          classification: "supported",
+          tokens: 80
+        }),
+        expect.objectContaining({
+          provider: "anthropic",
+          model: "unknown",
+          source: "Claude Code",
+          classification: "excluded",
+          tokens: 50,
+          reason: "Unsupported model: unknown"
+        }),
+        expect.objectContaining({
+          provider: "ollama",
+          model: "qwen3.5:9b",
+          source: "CLI",
+          classification: "excluded",
+          tokens: 50,
+          reason: "Unsupported provider: ollama"
+        })
+      ])
+    );
+    expect(overview.exclusions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          provider: "ollama",
+          model: "qwen3.5:9b",
+          source: "CLI"
+        })
+      ])
+    );
 
     const timeseriesResponse = await app.inject({
       method: "GET",
@@ -138,17 +253,18 @@ describe("API routes", () => {
     });
     const timeseries = timeseriesResponse.json();
     expect(timeseries.points).toHaveLength(1);
-    expect(timeseries.points[0].tokens).toBe(230);
+    expect(timeseries.points[0].tokens).toBe(360);
 
     const methodologyResponse = await app.inject({ method: "GET", url: "/api/methodology" });
     const methodology = methodologyResponse.json();
-    expect(methodology.pricingTable.some((entry: { model: string }) => entry.model === "gpt-5.3-codex")).toBe(true);
+    expect(methodology.pricingTable.some((entry: { model: string }) => entry.model === "gpt-5.2-codex")).toBe(true);
+    expect(methodology.pricingTable.some((entry: { model: string }) => entry.model === "claude-sonnet-4")).toBe(true);
     expect(methodology.benchmarkCoefficients).toEqual({
       low: 0.010585,
       central: 0.016904,
       high: 0.029926
     });
-    expect(methodology.exclusions).toHaveLength(1);
+    expect(methodology.exclusions).toHaveLength(2);
     expect(methodology.sourceLinks).toEqual(
       expect.arrayContaining([
         { label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)", url: "https://doi.org/10.1145/3724499" },
@@ -161,6 +277,7 @@ describe("API routes", () => {
 
     await app.close();
     codex.cleanup();
+    claude.cleanup();
     cache.cleanup();
   });
 });

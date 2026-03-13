@@ -19,9 +19,28 @@ export interface CoverageCounts {
   tokenOnlyEvents: number;
 }
 
+export interface CoverageSummary {
+  sessions: number;
+  prompts: number;
+  excludedModels: number;
+}
+
+export type CoverageClassification = "supported" | "excluded" | "token_only";
+
+export interface CoverageDetail {
+  provider: string;
+  model: string;
+  source: string;
+  tokens: number;
+  events: number;
+  classification: CoverageClassification;
+  reason: string | null;
+}
+
 export interface ExclusionSummary {
   provider: string;
   model: string;
+  source: string;
   tokens: number;
   events: number;
   reason: string;
@@ -46,6 +65,8 @@ export interface OverviewResponse {
   tokenTotals: TokenTotals;
   waterLitres: WaterRange;
   coverage: CoverageCounts;
+  coverageSummary: CoverageSummary;
+  coverageDetails: CoverageDetail[];
   exclusions: ExclusionSummary[];
   lastIndexedAt: number | null;
   calibration: CalibrationSnapshot | null;
@@ -53,6 +74,7 @@ export interface OverviewResponse {
 }
 
 export interface TimeseriesPoint {
+  startTs: number;
   key: string;
   label: string;
   tokens: number;

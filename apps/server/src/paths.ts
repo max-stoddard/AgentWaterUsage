@@ -26,6 +26,10 @@ export function getDefaultCodexHome(): string {
   return getCodexHomeConfig().path;
 }
 
+export function getDefaultClaudeHome(): string {
+  return path.join(os.homedir(), ".claude");
+}
+
 export function getCacheDir(): string {
   const configured = process.env.AGENTIC_INSIGHTS_CACHE_DIR;
   if (configured) {

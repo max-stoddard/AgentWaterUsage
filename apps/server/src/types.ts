@@ -1,4 +1,4 @@
-import type { CalibrationSnapshot, OverviewDiagnostics, PricingEntry, WaterRange } from "@agentic-insights/shared";
+import type { CalibrationSnapshot, CoverageClassification, OverviewDiagnostics, PricingEntry, WaterRange } from "@agentic-insights/shared";
 
 export interface FileRecord {
   path: string;
@@ -18,11 +18,11 @@ export interface RawUsageEvent {
   cachedInputTokens: number | null;
   outputTokens: number | null;
   splitSource: "last_usage" | "derived_totals" | "missing";
-  transport: "session" | "tui_fallback";
+  transport: "session" | "tui_fallback" | "claude_project" | "claude_summary";
 }
 
 export interface ClassifiedUsageEvent extends RawUsageEvent {
-  classification: "supported" | "excluded" | "token_only";
+  classification: CoverageClassification;
   waterLitres: WaterRange;
   eventCostUsd: number | null;
   exclusionReason: string | null;
@@ -31,14 +31,33 @@ export interface ClassifiedUsageEvent extends RawUsageEvent {
 export interface ExclusionAggregate {
   provider: string;
   model: string;
+  source: string;
   tokens: number;
   events: number;
   reason: string;
 }
 
+export interface CoverageDetailAggregate {
+  provider: string;
+  model: string;
+  source: string;
+  tokens: number;
+  events: number;
+  classification: CoverageClassification;
+  reason: string | null;
+}
+
+export interface PromptRecord {
+  id: string;
+  sessionId: string;
+  ts: number;
+}
+
 export interface DataSnapshot {
   signature: string;
   events: ClassifiedUsageEvent[];
+  promptRecords: PromptRecord[];
+  coverageDetails: CoverageDetailAggregate[];
   exclusions: ExclusionAggregate[];
   pricingTable: PricingEntry[];
   sourceLinks: Array<{ label: string; url: string }>;

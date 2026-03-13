@@ -1,18 +1,22 @@
 import fs from "node:fs";
 import type {
+  Bucket,
+  CoverageClassification,
   MethodologyResponse,
   OverviewDiagnostics,
   OverviewResponse,
+  TimeseriesPoint,
   TimeseriesResponse,
   WaterRange
 } from "@agentic-insights/shared";
 import { getOrCreateCalibration, buildSignature } from "./calibration.js";
-import { listSessionFiles, getTuiLogPath } from "./discovery.js";
-import { getCodexHomeConfig } from "./paths.js";
-import { parseSessionFile, parseTuiFallback } from "./parser.js";
-import { aggregateTimeseries } from "./aggregation.js";
+import { parseClaudeProjectFile, parseClaudeSessionMetaFile } from "./claude.js";
+import { getTuiLogPath, listClaudeProjectFiles, listClaudeSessionMetaFiles, listSessionFiles } from "./discovery.js";
+import { getCodexHomeConfig, getDefaultClaudeHome } from "./paths.js";
+import { parseSessionFile, parseSessionPrompts, parseTuiFallback } from "./parser.js";
+import { aggregateDayTimeseries, aggregateFromDayBuckets } from "./aggregation.js";
 import { BENCHMARK_COEFFICIENTS, PRICING_TABLE, calculateEventCostUsd, getMethodologySourceLinks, getPricingEntry } from "./pricing.js";
-import type { ClassifiedUsageEvent, DataSnapshot, ExclusionAggregate, RawUsageEvent } from "./types.js";
+import type { ClassifiedUsageEvent, CoverageDetailAggregate, DataSnapshot, PromptRecord, RawUsageEvent } from "./types.js";
 
 function zeroRange(): WaterRange {
   return { low: 0, central: 0, high: 0 };
@@ -35,19 +39,23 @@ function sumRange(target: WaterRange, source: WaterRange): void {
 function dedupeEvents(events: RawUsageEvent[]): RawUsageEvent[] {
   const map = new Map<string, RawUsageEvent>();
   for (const event of events) {
-    const key = [
-      event.sessionId,
-      event.ts,
-      event.totalTokens,
-      event.inputTokens,
-      event.outputTokens,
-      event.cachedInputTokens,
-      event.transport
-    ].join("|");
-    if (!map.has(key)) {
-      map.set(key, event);
+    const existing = map.get(event.id);
+    if (!existing || event.ts < existing.ts) {
+      map.set(event.id, event);
     }
   }
+  return [...map.values()].sort((a, b) => a.ts - b.ts);
+}
+
+function dedupePrompts(prompts: PromptRecord[]): PromptRecord[] {
+  const map = new Map<string, PromptRecord>();
+  for (const prompt of prompts) {
+    const existing = map.get(prompt.id);
+    if (!existing || prompt.ts < existing.ts) {
+      map.set(prompt.id, prompt);
+    }
+  }
+
   return [...map.values()].sort((a, b) => a.ts - b.ts);
 }
 
@@ -67,6 +75,8 @@ function createSnapshot(signature: string, diagnostics: OverviewDiagnostics): Da
   return {
     signature,
     events: [],
+    promptRecords: [],
+    coverageDetails: [],
     exclusions: [],
     pricingTable: PRICING_TABLE,
     sourceLinks: getMethodologySourceLinks(),
@@ -77,12 +87,12 @@ function createSnapshot(signature: string, diagnostics: OverviewDiagnostics): Da
   };
 }
 
-function getNoDataMessage(foundFiles: boolean, foundLog: boolean): string {
-  if (foundFiles || foundLog) {
-    return "Codex data was found, but no token history could be parsed yet.";
+function getNoDataMessage(foundArtifacts: boolean): string {
+  if (foundArtifacts) {
+    return "Local coding agent data was found, but no token history could be parsed yet.";
   }
 
-  return "No Codex usage files were found in this directory yet.";
+  return "No local coding agent usage files were found in the tracked directories yet.";
 }
 
 function getErrorMessage(error: unknown): string {
@@ -90,10 +100,62 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "The local Codex usage directory could not be read.";
+  return "The local coding agent usage directories could not be read.";
 }
 
-function classifyEvents(rawEvents: RawUsageEvent[], signature: string): Pick<DataSnapshot, "events" | "exclusions" | "calibration"> {
+function formatSourceLabel(source: string): string {
+  const normalized = source.trim().toLowerCase();
+  if (!normalized || normalized === "unknown") {
+    return "Unknown";
+  }
+
+  if (normalized === "vscode") {
+    return "VS Code extension";
+  }
+
+  if (normalized === "cli" || normalized === "exec") {
+    return "CLI";
+  }
+
+  if (normalized === "claude_code") {
+    return "Claude Code";
+  }
+
+  return normalized
+    .split(/[^a-z0-9]+/i)
+    .filter(Boolean)
+    .map((part) => part[0]!.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function addCoverageDetail(
+  details: Map<string, CoverageDetailAggregate>,
+  event: RawUsageEvent,
+  classification: CoverageClassification,
+  reason: string | null
+): void {
+  const source = formatSourceLabel(event.source);
+  const key = [event.provider, event.model, source, classification, reason ?? ""].join("|");
+  const current = details.get(key) ?? {
+    provider: event.provider,
+    model: event.model,
+    source,
+    tokens: 0,
+    events: 0,
+    classification,
+    reason
+  };
+
+  current.tokens += event.totalTokens;
+  current.events += 1;
+  details.set(key, current);
+}
+
+function getMonitoredDataPath(codexHome: string, claudeHome: string): string {
+  return `${codexHome}\n${claudeHome}`;
+}
+
+function classifyEvents(rawEvents: RawUsageEvent[], signature: string): Pick<DataSnapshot, "events" | "coverageDetails" | "exclusions" | "calibration"> {
   const supportedCosts = rawEvents
     .flatMap((event) => {
       if (
@@ -113,7 +175,7 @@ function classifyEvents(rawEvents: RawUsageEvent[], signature: string): Pick<Dat
     .filter((value) => value > 0);
 
   const calibration = getOrCreateCalibration(signature, supportedCosts);
-  const exclusions = new Map<string, ExclusionAggregate>();
+  const coverageDetails = new Map<string, CoverageDetailAggregate>();
 
   const events: ClassifiedUsageEvent[] = rawEvents.map((event) => {
     if (
@@ -122,32 +184,25 @@ function classifyEvents(rawEvents: RawUsageEvent[], signature: string): Pick<Dat
       event.cachedInputTokens === null ||
       event.outputTokens === null
     ) {
+      const reason = "Token totals are available, but token splits needed for pricing-weighted estimation are missing.";
+      addCoverageDetail(coverageDetails, event, "token_only", reason);
+
       return {
         ...event,
         classification: "token_only",
         waterLitres: zeroRange(),
         eventCostUsd: null,
-        exclusionReason: "Token totals are available, but token splits needed for pricing-weighted estimation are missing."
+        exclusionReason: reason
       };
     }
 
     const pricing = getPricingEntry(event.provider, event.model);
     if (!pricing) {
       const reason =
-        event.provider !== "openai"
+        event.provider !== "openai" && event.provider !== "anthropic" && event.provider !== "claude"
           ? `Unsupported provider: ${event.provider}`
           : `Unsupported model: ${event.model}`;
-      const exclusionKey = `${event.provider}:${event.model}:${reason}`;
-      const current = exclusions.get(exclusionKey) ?? {
-        provider: event.provider,
-        model: event.model,
-        tokens: 0,
-        events: 0,
-        reason
-      };
-      current.tokens += event.totalTokens;
-      current.events += 1;
-      exclusions.set(exclusionKey, current);
+      addCoverageDetail(coverageDetails, event, "excluded", reason);
 
       return {
         ...event,
@@ -163,6 +218,7 @@ function classifyEvents(rawEvents: RawUsageEvent[], signature: string): Pick<Dat
       calibration && calibration.referenceEventCostUsd > 0
         ? scaleRange(BENCHMARK_COEFFICIENTS, eventCostUsd / calibration.referenceEventCostUsd)
         : zeroRange();
+    addCoverageDetail(coverageDetails, event, "supported", null);
 
     return {
       ...event,
@@ -173,15 +229,41 @@ function classifyEvents(rawEvents: RawUsageEvent[], signature: string): Pick<Dat
     };
   });
 
+  const sortedCoverageDetails = [...coverageDetails.values()].sort((a, b) => {
+    if (b.tokens !== a.tokens) {
+      return b.tokens - a.tokens;
+    }
+
+    return [a.provider, a.model, a.source].join("|").localeCompare([b.provider, b.model, b.source].join("|"));
+  });
+
   return {
     events,
-    exclusions: [...exclusions.values()].sort((a, b) => b.tokens - a.tokens),
+    coverageDetails: sortedCoverageDetails,
+    exclusions: sortedCoverageDetails.flatMap((item) => {
+      if (item.classification !== "excluded" || item.reason === null) {
+        return [];
+      }
+
+      return [
+        {
+          provider: item.provider,
+          model: item.model,
+          source: item.source,
+          tokens: item.tokens,
+          events: item.events,
+          reason: item.reason
+        }
+      ];
+    }),
     calibration
   };
 }
 
 export class DashboardService {
   private cachedSnapshot: DataSnapshot | null = null;
+  private dayTimeseriesCache = new Map<string, TimeseriesPoint[]>();
+  private timeseriesCache = new Map<string, TimeseriesPoint[]>();
 
   public getOverview(): OverviewResponse {
     const snapshot = this.getSnapshot();
@@ -223,6 +305,12 @@ export class DashboardService {
         excludedEvents,
         tokenOnlyEvents
       },
+      coverageSummary: {
+        sessions: new Set([...snapshot.events.map((event) => event.sessionId), ...snapshot.promptRecords.map((prompt) => prompt.sessionId)]).size,
+        prompts: snapshot.promptRecords.length,
+        excludedModels: snapshot.coverageDetails.filter((item) => item.classification === "excluded").length
+      },
+      coverageDetails: snapshot.coverageDetails,
       exclusions: snapshot.exclusions,
       lastIndexedAt: snapshot.lastIndexedAt,
       calibration: snapshot.calibration,
@@ -230,11 +318,25 @@ export class DashboardService {
     };
   }
 
-  public getTimeseries(bucket: "day" | "week" | "month", timeZone: string): TimeseriesResponse {
+  public getTimeseries(bucket: Bucket, timeZone: string): TimeseriesResponse {
     const snapshot = this.getSnapshot();
+    const cacheKey = this.getTimeseriesCacheKey(snapshot.signature, bucket, timeZone);
+    const cached = this.timeseriesCache.get(cacheKey);
+
+    if (cached) {
+      return {
+        bucket,
+        points: cached
+      };
+    }
+
+    const dayPoints = this.getDayTimeseries(snapshot, timeZone);
+    const points = bucket === "day" ? dayPoints : aggregateFromDayBuckets(dayPoints, bucket, timeZone);
+    this.timeseriesCache.set(cacheKey, points);
+
     return {
       bucket,
-      points: aggregateTimeseries(snapshot.events, bucket, timeZone)
+      points
     };
   }
 
@@ -252,38 +354,73 @@ export class DashboardService {
   private getSnapshot(): DataSnapshot {
     const codexHomeConfig = getCodexHomeConfig();
     const codexHome = codexHomeConfig.path;
+    const claudeHome = getDefaultClaudeHome();
+    const dataPath = getMonitoredDataPath(codexHome, claudeHome);
 
     try {
-      if (!fs.existsSync(codexHome)) {
-        const diagnostics = codexHomeConfig.fromEnv
-          ? createDiagnostics("read_error", codexHome, "Configured Codex home does not exist.")
-          : createDiagnostics("no_data", codexHome, "No local Codex history was found yet.");
-        return this.getOrCacheSnapshot(
-          createSnapshot(buildSignature({ codexHome, codexHomeState: "missing", fileFingerprint: [] }), diagnostics)
-        );
-      }
+      const codexExists = fs.existsSync(codexHome);
+      const codexIsDirectory = codexExists && fs.statSync(codexHome).isDirectory();
+      const claudeExists = fs.existsSync(claudeHome);
+      const claudeIsDirectory = claudeExists && fs.statSync(claudeHome).isDirectory();
 
-      if (!fs.statSync(codexHome).isDirectory()) {
-        const diagnostics = createDiagnostics("read_error", codexHome, "Configured Codex home is not a directory.");
-        return this.getOrCacheSnapshot(
-          createSnapshot(buildSignature({ codexHome, codexHomeState: "not_directory", fileFingerprint: [] }), diagnostics)
-        );
-      }
-
-      const files = listSessionFiles(codexHome);
+      const codexFiles = codexIsDirectory ? listSessionFiles(codexHome) : [];
       const tuiLogPath = getTuiLogPath(codexHome);
-      const logFingerprint = fs.existsSync(tuiLogPath)
-        ? [{ path: tuiLogPath, mtimeMs: Math.floor(fs.statSync(tuiLogPath).mtimeMs), size: fs.statSync(tuiLogPath).size }]
+      const logFingerprint =
+        codexIsDirectory && fs.existsSync(tuiLogPath)
+          ? [{ path: tuiLogPath, mtimeMs: Math.floor(fs.statSync(tuiLogPath).mtimeMs), size: fs.statSync(tuiLogPath).size }]
+          : [];
+      const codexEvents = codexIsDirectory
+        ? (() => {
+            const fallbackMap = parseTuiFallback(tuiLogPath);
+            return codexFiles.flatMap((file) => parseSessionFile(file.path, fallbackMap));
+          })()
         : [];
-      const fingerprint = [...files.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size })), ...logFingerprint];
-      const fallbackMap = parseTuiFallback(tuiLogPath);
-      const rawEvents = dedupeEvents(files.flatMap((file) => parseSessionFile(file.path, fallbackMap)));
+      const codexPrompts = codexIsDirectory ? codexFiles.flatMap((file) => parseSessionPrompts(file.path)) : [];
+
+      const claudeProjectFiles = claudeIsDirectory ? listClaudeProjectFiles(claudeHome) : [];
+      const claudeSessionMetaFiles = claudeIsDirectory ? listClaudeSessionMetaFiles(claudeHome) : [];
+      const claudeSessionModels = new Map<string, string>();
+      const parsedClaudeProjects = claudeProjectFiles.map((file) => parseClaudeProjectFile(file.path));
+      const claudeProjectEvents = parsedClaudeProjects.flatMap((parsed) => {
+        for (const [sessionId, model] of parsed.sessionModels.entries()) {
+          if (!claudeSessionModels.has(sessionId)) {
+            claudeSessionModels.set(sessionId, model);
+          }
+        }
+        return parsed.events;
+      });
+      const claudeProjectPrompts = parsedClaudeProjects.flatMap((parsed) => parsed.prompts);
+      const claudeMetaEvents = claudeSessionMetaFiles.flatMap((file) =>
+        parseClaudeSessionMetaFile(file.path, {
+          sessionModels: claudeSessionModels,
+          sessionsWithProjectEvents: new Set(claudeProjectEvents.map((event) => event.sessionId))
+        })
+      );
+
+      const rawEvents = dedupeEvents([...codexEvents, ...claudeProjectEvents, ...claudeMetaEvents]);
+      const promptRecords = dedupePrompts([...codexPrompts, ...claudeProjectPrompts]);
+      const fingerprint = [
+        ...codexFiles.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size })),
+        ...logFingerprint,
+        ...claudeProjectFiles.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size })),
+        ...claudeSessionMetaFiles.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size }))
+      ];
+      const foundArtifacts = fingerprint.length > 0;
+      const codexConfiguredInvalid =
+        codexHomeConfig.fromEnv && (!codexExists || (codexExists && !codexIsDirectory));
       const diagnostics =
-        rawEvents.length > 0
-          ? createDiagnostics("ready", codexHome, null)
-          : createDiagnostics("no_data", codexHome, getNoDataMessage(files.length > 0, logFingerprint.length > 0));
+        rawEvents.length > 0 || promptRecords.length > 0
+          ? createDiagnostics("ready", dataPath, null)
+          : codexConfiguredInvalid
+            ? createDiagnostics(
+                "read_error",
+                dataPath,
+                !codexExists ? "Configured Codex home does not exist." : "Configured Codex home is not a directory."
+              )
+            : createDiagnostics("no_data", dataPath, getNoDataMessage(foundArtifacts));
       const signature = buildSignature({
         codexHome,
+        claudeHome,
         codexHomeState: diagnostics.state === "ready" ? "ready" : "empty",
         fileFingerprint: fingerprint
       });
@@ -293,11 +430,13 @@ export class DashboardService {
       }
 
       const classified = classifyEvents(rawEvents, signature);
-      const lastIndexedAt = files.length > 0 ? Math.max(...files.map((file) => file.mtimeMs)) : null;
+      const lastIndexedAt = fingerprint.length > 0 ? Math.max(...fingerprint.map((file) => file.mtimeMs)) : null;
 
-      this.cachedSnapshot = {
+      return this.cacheSnapshot({
         signature,
         events: classified.events,
+        promptRecords,
+        coverageDetails: classified.coverageDetails,
         exclusions: classified.exclusions,
         pricingTable: PRICING_TABLE,
         sourceLinks: getMethodologySourceLinks(),
@@ -305,14 +444,14 @@ export class DashboardService {
         calibration: classified.calibration,
         lastIndexedAt,
         diagnostics
-      };
-      return this.cachedSnapshot;
+      });
     } catch (error) {
-      const diagnostics = createDiagnostics("read_error", codexHome, getErrorMessage(error));
+      const diagnostics = createDiagnostics("read_error", dataPath, getErrorMessage(error));
       return this.getOrCacheSnapshot(
         createSnapshot(
           buildSignature({
             codexHome,
+            claudeHome,
             codexHomeState: "read_error",
             fileFingerprint: []
           }),
@@ -325,6 +464,32 @@ export class DashboardService {
   private getOrCacheSnapshot(snapshot: DataSnapshot): DataSnapshot {
     if (this.cachedSnapshot?.signature === snapshot.signature) {
       return this.cachedSnapshot;
+    }
+
+    return this.cacheSnapshot(snapshot);
+  }
+
+  private getDayTimeseries(snapshot: DataSnapshot, timeZone: string): TimeseriesPoint[] {
+    const cacheKey = `${snapshot.signature}|${timeZone}`;
+    const cached = this.dayTimeseriesCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const points = aggregateDayTimeseries(snapshot.events, timeZone);
+    this.dayTimeseriesCache.set(cacheKey, points);
+    this.timeseriesCache.set(this.getTimeseriesCacheKey(snapshot.signature, "day", timeZone), points);
+    return points;
+  }
+
+  private getTimeseriesCacheKey(signature: string, bucket: Bucket, timeZone: string): string {
+    return `${signature}|${bucket}|${timeZone}`;
+  }
+
+  private cacheSnapshot(snapshot: DataSnapshot): DataSnapshot {
+    if (this.cachedSnapshot?.signature !== snapshot.signature) {
+      this.dayTimeseriesCache.clear();
+      this.timeseriesCache.clear();
     }
 
     this.cachedSnapshot = snapshot;

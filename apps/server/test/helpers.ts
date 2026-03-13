@@ -7,6 +7,12 @@ export interface TestCodexHome {
   cleanup: () => void;
 }
 
+export interface TestClaudeHome {
+  homeDir: string;
+  claudeDir: string;
+  cleanup: () => void;
+}
+
 export interface TestCacheDir {
   dir: string;
   cleanup: () => void;
@@ -31,10 +37,30 @@ export function createCacheDir(): TestCacheDir {
   };
 }
 
+export function createClaudeHome(): TestClaudeHome {
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentic-insights-home-"));
+  const claudeDir = path.join(homeDir, ".claude");
+  fs.mkdirSync(path.join(claudeDir, "projects"), { recursive: true });
+  fs.mkdirSync(path.join(claudeDir, "usage-data", "session-meta"), { recursive: true });
+
+  return {
+    homeDir,
+    claudeDir,
+    cleanup: () => fs.rmSync(homeDir, { recursive: true, force: true })
+  };
+}
+
 export function writeJsonlFile(root: string, relativePath: string, rows: unknown[]): string {
   const fullPath = path.join(root, relativePath);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, rows.map((row) => JSON.stringify(row)).join("\n"));
+  return fullPath;
+}
+
+export function writeJsonFile(root: string, relativePath: string, value: unknown): string {
+  const fullPath = path.join(root, relativePath);
+  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+  fs.writeFileSync(fullPath, JSON.stringify(value, null, 2));
   return fullPath;
 }
 

@@ -33,6 +33,13 @@ describe("pricing methodology", () => {
     expect(pricing?.cachedInputUsdPerMillion).toBe(0.175);
   });
 
+  it("resolves anthropic model aliases and provider aliases", () => {
+    const pricing = getPricingEntry("claude", "claude-sonnet-4-20250514");
+    expect(pricing).not.toBeNull();
+    expect(pricing?.model).toBe("claude-sonnet-4");
+    expect(pricing?.inputUsdPerMillion).toBe(3);
+  });
+
   it("returns null for unsupported models", () => {
     expect(getPricingEntry("ollama", "qwen3.5:9b")).toBeNull();
   });
@@ -67,6 +74,10 @@ describe("pricing methodology", () => {
         {
           label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
           url: "https://arxiv.org/abs/2304.03271"
+        },
+        {
+          label: "Anthropic API pricing",
+          url: "https://docs.anthropic.com/en/docs/about-claude/pricing"
         }
       ])
     );

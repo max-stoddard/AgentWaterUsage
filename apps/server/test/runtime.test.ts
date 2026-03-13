@@ -3,15 +3,17 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { createCacheDir, createCodexHome, writeJsonlFile } from "./helpers.js";
+import { createCacheDir, createClaudeHome, createCodexHome, writeJsonFile, writeJsonlFile } from "./helpers.js";
 
 let previousCodexHome: string | undefined;
 let previousCacheDir: string | undefined;
+let previousHome: string | undefined;
 const cleanupDirs: string[] = [];
 
 beforeEach(() => {
   previousCodexHome = process.env.CODEX_HOME;
   previousCacheDir = process.env.AGENTIC_INSIGHTS_CACHE_DIR;
+  previousHome = process.env.HOME;
 });
 
 afterEach(() => {
@@ -25,6 +27,12 @@ afterEach(() => {
     delete process.env.AGENTIC_INSIGHTS_CACHE_DIR;
   } else {
     process.env.AGENTIC_INSIGHTS_CACHE_DIR = previousCacheDir;
+  }
+
+  if (previousHome === undefined) {
+    delete process.env.HOME;
+  } else {
+    process.env.HOME = previousHome;
   }
 
   for (const dir of cleanupDirs.splice(0)) {
@@ -66,8 +74,10 @@ describe("server runtime", () => {
 
   it("reports ready diagnostics when parsed Codex usage is available", async () => {
     const codex = createCodexHome();
+    const claude = createClaudeHome();
     const cache = createCacheDir();
     process.env.CODEX_HOME = codex.dir;
+    process.env.HOME = claude.homeDir;
     process.env.AGENTIC_INSIGHTS_CACHE_DIR = cache.dir;
 
     writeJsonlFile(codex.dir, "sessions/2026/03/09/session-openai.jsonl", [
@@ -114,39 +124,54 @@ describe("server runtime", () => {
     const overview = response.json<{ diagnostics: { codexHome: string; message: string | null; state: string } }>();
 
     expect(overview.diagnostics).toEqual({
-      codexHome: codex.dir,
+      codexHome: `${codex.dir}\n${claude.claudeDir}`,
       message: null,
       state: "ready"
     });
 
     await app.close();
     codex.cleanup();
+    claude.cleanup();
     cache.cleanup();
   });
 
-  it("reports no_data diagnostics when the Codex home is empty", async () => {
+  it("reports ready diagnostics when only Claude local usage is available", async () => {
     const codex = createCodexHome();
+    const claude = createClaudeHome();
     const cache = createCacheDir();
     process.env.CODEX_HOME = codex.dir;
+    process.env.HOME = claude.homeDir;
     process.env.AGENTIC_INSIGHTS_CACHE_DIR = cache.dir;
+
+    writeJsonFile(claude.homeDir, ".claude/usage-data/session-meta/session-only-claude.json", {
+      session_id: "session-only-claude",
+      start_time: "2026-03-09T10:00:00.000Z",
+      input_tokens: 40,
+      output_tokens: 10
+    });
 
     const app = createApp();
     const response = await app.inject({ method: "GET", url: "/api/overview" });
-    const overview = response.json<{ diagnostics: { codexHome: string; message: string; state: string } }>();
+    const overview = response.json<{ diagnostics: { codexHome: string; message: string | null; state: string } }>();
 
-    expect(overview.diagnostics.codexHome).toBe(codex.dir);
-    expect(overview.diagnostics.state).toBe("no_data");
-    expect(overview.diagnostics.message).toMatch(/No Codex usage files/i);
+    expect(overview.diagnostics).toEqual({
+      codexHome: `${codex.dir}\n${claude.claudeDir}`,
+      message: null,
+      state: "ready"
+    });
 
     await app.close();
     codex.cleanup();
+    claude.cleanup();
     cache.cleanup();
   });
 
   it("reports read_error diagnostics when the configured Codex home is missing", async () => {
     const missingDir = path.join(os.tmpdir(), `ai-water-missing-${Date.now()}`);
+    const claude = createClaudeHome();
     const cache = createCacheDir();
     process.env.CODEX_HOME = missingDir;
+    process.env.HOME = claude.homeDir;
     process.env.AGENTIC_INSIGHTS_CACHE_DIR = cache.dir;
 
     const app = createApp();
@@ -154,12 +179,13 @@ describe("server runtime", () => {
     const overview = response.json<{ diagnostics: { codexHome: string; message: string; state: string } }>();
 
     expect(overview.diagnostics).toEqual({
-      codexHome: missingDir,
+      codexHome: `${missingDir}\n${claude.claudeDir}`,
       message: "Configured Codex home does not exist.",
       state: "read_error"
     });
 
     await app.close();
+    claude.cleanup();
     cache.cleanup();
   });
 });
