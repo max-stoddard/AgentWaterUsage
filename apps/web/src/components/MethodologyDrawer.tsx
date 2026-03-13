@@ -157,7 +157,7 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
         aria-modal="true"
         aria-label="How it works"
         tabIndex={-1}
-        className="absolute bottom-0 right-0 top-0 flex w-full max-w-2xl flex-col bg-white shadow-2xl outline-none transition-transform duration-300"
+        className="absolute bottom-0 right-0 top-0 flex w-full max-w-2xl flex-col overflow-x-hidden bg-white shadow-2xl outline-none transition-transform duration-300"
       >
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200/60 bg-white px-6 py-4">
           <h2 className="text-base font-semibold text-ink">How it works</h2>
@@ -173,7 +173,7 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6">
           {loading || !methodology ? (
             <div className="space-y-4">
               <SkeletonBlock className="h-20" />
@@ -182,7 +182,7 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
             </div>
           ) : (
             <div className="space-y-8">
-              <div className="inline-flex rounded-lg bg-surface-muted p-1">
+              <div className="flex flex-wrap rounded-lg bg-surface-muted p-1">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -216,7 +216,6 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                     sessions={overview?.coverageSummary.sessions ?? 0}
                     prompts={overview?.coverageSummary.prompts ?? 0}
                     tokens={overview?.tokenTotals.supportedTokens ?? 0}
-                    compact={false}
                   />
                   <ModelUsageStatusKey />
 
@@ -246,7 +245,7 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                   <section>
                     <h3 className="text-sm font-semibold text-ink">Model-cost formula</h3>
                     <div className="mt-3 space-y-2">
-                      <code className="block overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-xs leading-6 text-slate-100">
+                      <code className="block overflow-x-hidden whitespace-normal break-words rounded-lg bg-slate-900 px-4 py-3 text-xs leading-6 text-slate-100">
                         eventCostUsd = input/1e6 * inputPrice + cachedInput/1e6 * cachedInputPrice + output/1e6 * outputPrice
                       </code>
                     </div>
@@ -294,25 +293,25 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                       </p>
                     </div>
                     <div className="mt-3 overflow-hidden rounded-lg border border-slate-200/60">
-                      <div className="max-h-[26rem] overflow-auto">
-                        <table className="min-w-full border-collapse text-left text-sm">
+                      <div className="max-h-[26rem] overflow-y-auto overflow-x-hidden">
+                        <table className="w-full table-fixed border-collapse text-left text-sm">
                           <thead className="sticky top-0 bg-surface-muted text-xs font-medium text-ink-secondary">
                             <tr>
-                              <th className="px-3 py-2.5 font-medium">Provider</th>
-                              <th className="px-3 py-2.5 font-medium">Model</th>
-                              <th className="px-3 py-2.5 font-medium">Input</th>
-                              <th className="px-3 py-2.5 font-medium">Cached</th>
-                              <th className="px-3 py-2.5 font-medium">Output</th>
+                              <th className="w-[16%] px-3 py-2.5 font-medium">Provider</th>
+                              <th className="w-[36%] px-3 py-2.5 font-medium">Model</th>
+                              <th className="w-[16%] px-3 py-2.5 font-medium">Input</th>
+                              <th className="w-[16%] px-3 py-2.5 font-medium">Cached</th>
+                              <th className="w-[16%] px-3 py-2.5 font-medium">Output</th>
                             </tr>
                           </thead>
                           <tbody>
                             {filteredPricingTable.map((entry) => (
                               <tr key={`${entry.provider}:${entry.model}`} className="border-t border-slate-200/60">
-                                <td className="px-3 py-2.5 font-medium text-ink">{entry.provider}</td>
-                                <td className="px-3 py-2.5 text-ink-secondary">{entry.model}</td>
-                                <td className="px-3 py-2.5 text-ink-secondary">{formatUsdPerMillion(entry.inputUsdPerMillion)}</td>
-                                <td className="px-3 py-2.5 text-ink-secondary">{formatUsdPerMillion(entry.cachedInputUsdPerMillion)}</td>
-                                <td className="px-3 py-2.5 text-ink-secondary">{formatUsdPerMillion(entry.outputUsdPerMillion)}</td>
+                                <td className="break-words px-3 py-2.5 align-top font-medium text-ink">{entry.provider}</td>
+                                <td className="break-words px-3 py-2.5 align-top text-ink-secondary">{entry.model}</td>
+                                <td className="break-words px-3 py-2.5 align-top text-ink-secondary">{formatUsdPerMillion(entry.inputUsdPerMillion)}</td>
+                                <td className="break-words px-3 py-2.5 align-top text-ink-secondary">{formatUsdPerMillion(entry.cachedInputUsdPerMillion)}</td>
+                                <td className="break-words px-3 py-2.5 align-top text-ink-secondary">{formatUsdPerMillion(entry.outputUsdPerMillion)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -358,7 +357,7 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                   <section>
                     <h3 className="text-sm font-semibold text-ink">Formulas</h3>
                     <div className="mt-3 space-y-2">
-                      <code className="block overflow-x-auto rounded-lg bg-surface-muted px-4 py-3 text-xs leading-6 text-ink-secondary">
+                      <code className="block overflow-x-hidden whitespace-normal break-words rounded-lg bg-surface-muted px-4 py-3 text-xs leading-6 text-ink-secondary">
                         waterLitres = eventCostUsd / referenceEventCostUsd * benchmarkCoefficient
                       </code>
                     </div>

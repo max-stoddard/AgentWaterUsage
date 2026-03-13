@@ -38,12 +38,13 @@ export function CoverageSummary({ overview, onOpenMethodology }: CoverageSummary
         sessions={overview.coverageSummary.sessions}
         prompts={overview.coverageSummary.prompts}
         tokens={overview.tokenTotals.supportedTokens}
+        growth={overview.weeklyGrowth}
       />
       <ModelUsageStatusKey />
 
       {hasModelUsage ? (
         <div className="mt-5">
-          <ModelUsageList items={topModels} />
+          <ModelUsageList items={topModels} showRank />
 
           {remainingModels.length > 0 ? (
             <div className="mt-4">

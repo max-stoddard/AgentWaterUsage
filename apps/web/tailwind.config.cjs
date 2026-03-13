@@ -3,6 +3,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        footprint: {
+          water: "#0EA5E9",
+          energy: "#F59E0B",
+          token: "#4F46E5",
+          carbon: "#475569"
+        },
         surface: {
           DEFAULT: "#FFFFFF",
           muted: "#F1F5F9",

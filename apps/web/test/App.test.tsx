@@ -1,10 +1,32 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 
 const fetchMock = vi.fn<typeof fetch>();
 
-function mockDashboardResponses() {
+function mockDashboardResponses(options?: {
+  weeklyGrowth?: {
+    sessions: { current: number; previous: number; increase: number };
+    prompts: { current: number; previous: number; increase: number };
+    tokens: { current: number; previous: number; increase: number };
+  };
+  coverageSummary?: {
+    sessions: number;
+    prompts: number;
+  };
+  supportedTokens?: number;
+}) {
+  const weeklyGrowth = options?.weeklyGrowth ?? {
+    sessions: { current: 12, previous: 9, increase: 3 },
+    prompts: { current: 47, previous: 41, increase: 6 },
+    tokens: { current: 900, previous: 650, increase: 250 }
+  };
+  const coverageSummary = options?.coverageSummary ?? {
+    sessions: 12,
+    prompts: 47
+  };
+  const supportedTokens = options?.supportedTokens ?? 900;
+
   fetchMock.mockImplementation(async (input) => {
     const url = String(input);
     if (url.startsWith("/api/overview")) {
@@ -12,7 +34,7 @@ function mockDashboardResponses() {
         JSON.stringify({
           tokenTotals: {
             totalTokens: 1000,
-            supportedTokens: 900,
+            supportedTokens,
             excludedTokens: 50,
             unestimatedTokens: 50
           },
@@ -27,10 +49,11 @@ function mockDashboardResponses() {
             tokenOnlyEvents: 1
           },
           coverageSummary: {
-            sessions: 12,
-            prompts: 47,
+            sessions: coverageSummary.sessions,
+            prompts: coverageSummary.prompts,
             excludedModels: 2
           },
+          weeklyGrowth,
           modelUsage: [
             {
               provider: "openai",
@@ -363,6 +386,10 @@ describe("App", () => {
     expect(screen.getByText("sessions")).toBeInTheDocument();
     expect(screen.getByText("prompts")).toBeInTheDocument();
     expect(breakdownSection).toHaveTextContent("tokens");
+    expect(screen.getByText("+3 this week")).toBeInTheDocument();
+    expect(screen.getByText("+6 this week")).toBeInTheDocument();
+    expect(screen.getByText("+250 this week")).toBeInTheDocument();
+    expect(screen.getByText("+3 this week").parentElement).toHaveClass("inline-flex");
     expect(screen.getByText("Included in estimate")).toBeInTheDocument();
     expect(screen.getByText("Local usage")).toBeInTheDocument();
     expect(screen.getByText("Pricing not available")).toBeInTheDocument();
@@ -430,8 +457,55 @@ describe("App", () => {
     expect(screen.getByText("1,000 tokens")).toBeInTheDocument();
   });
 
-  it("opens the methodology drawer and shows pricing and sources", async () => {
+  it("opens and closes the privacy badge popup", async () => {
     mockDashboardResponses();
+
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /Your data stays local/i })).toBeInTheDocument();
+    expect(screen.queryByText("Private on this device")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Your data stays local/i }));
+
+    expect(screen.getByRole("dialog", { name: "Privacy details" })).toBeInTheDocument();
+    expect(screen.getByText("Private on this device")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Your usage data stays on this device. Nothing is uploaded to a server for this dashboard, so only you can see it./i
+      )
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Private on this device")).not.toBeInTheDocument();
+    });
+  });
+
+  it("closes the privacy badge popup when clicking outside", async () => {
+    mockDashboardResponses();
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Your data stays local/i }));
+
+    expect(screen.getByText("Private on this device")).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Private on this device")).not.toBeInTheDocument();
+    });
+  });
+
+  it("opens the methodology drawer and shows pricing and sources", async () => {
+    mockDashboardResponses({
+      coverageSummary: {
+        sessions: 244,
+        prompts: 1905
+      },
+      supportedTokens: 1_143_889_843
+    });
 
     render(<App />);
 
@@ -442,6 +516,7 @@ describe("App", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /How it works/i })[0]!);
 
     expect(await screen.findByRole("dialog", { name: /How it works/i })).toBeInTheDocument();
+    const methodologyDrawer = screen.getByRole("dialog", { name: /How it works/i });
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith("/api/methodology");
@@ -451,9 +526,14 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Water" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Energy" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Carbon" })).toBeInTheDocument();
+    expect(methodologyDrawer).toHaveClass("overflow-x-hidden");
     expect(screen.getByText(/Sessions are distinct Codex and Claude Code runs/i)).toBeInTheDocument();
     expect(screen.getAllByText("Included in estimate").length).toBeGreaterThan(0);
     expect(screen.getByText(/Bundled pricing snapshot/i)).toBeInTheDocument();
+    expect(within(methodologyDrawer).getByText("244")).toBeInTheDocument();
+    expect(within(methodologyDrawer).getByText("1.91K")).toBeInTheDocument();
+    expect(within(methodologyDrawer).getByText("1.14B")).toBeInTheDocument();
+    expect(within(methodologyDrawer).getByRole("table").parentElement).toHaveClass("overflow-y-auto", "overflow-x-hidden");
     expect(screen.getByText(/eventCostUsd = input\/1e6/i)).toBeInTheDocument();
     expect(await screen.findByText(/gpt-5.2-codex/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Portkey models repo \(MIT\)/i })).toHaveAttribute(
@@ -495,6 +575,9 @@ describe("App", () => {
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText("47")).toBeInTheDocument();
     expect(screen.getByText("900")).toBeInTheDocument();
+    expect(screen.getByLabelText("First place")).toBeInTheDocument();
+    expect(screen.getByLabelText("Second place")).toBeInTheDocument();
+    expect(screen.getByLabelText("Third place")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Show all models/i }));
 
@@ -504,7 +587,26 @@ describe("App", () => {
     expect(screen.getByText("50 tokens · pricing not available yet")).toBeInTheDocument();
     expect(screen.getByText("ollama / qwen2.5-coder:7b")).toBeInTheDocument();
     expect(screen.getByText("40 tokens · local usage")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Fourth place")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Show fewer models/i })).toBeInTheDocument();
+  });
+
+  it("hides weekly growth chips when metrics are flat or down", async () => {
+    mockDashboardResponses({
+      weeklyGrowth: {
+        sessions: { current: 12, previous: 12, increase: 0 },
+        prompts: { current: 47, previous: 50, increase: 0 },
+        tokens: { current: 900, previous: 900, increase: 0 }
+      }
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.queryByText(/this week/i)).not.toBeInTheDocument();
   });
 
   it("shows neutral onboarding guidance when no local usage history is available", async () => {
@@ -533,6 +635,11 @@ describe("App", () => {
               sessions: 0,
               prompts: 0,
               excludedModels: 0
+            },
+            weeklyGrowth: {
+              sessions: { current: 0, previous: 0, increase: 0 },
+              prompts: { current: 0, previous: 0, increase: 0 },
+              tokens: { current: 0, previous: 0, increase: 0 }
             },
             modelUsage: [],
             coverageDetails: [],
@@ -587,6 +694,11 @@ describe("App", () => {
               sessions: 0,
               prompts: 0,
               excludedModels: 0
+            },
+            weeklyGrowth: {
+              sessions: { current: 0, previous: 0, increase: 0 },
+              prompts: { current: 0, previous: 0, increase: 0 },
+              tokens: { current: 0, previous: 0, increase: 0 }
             },
             modelUsage: [],
             coverageDetails: [],

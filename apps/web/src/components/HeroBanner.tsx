@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
+import { FOOTPRINT_TEXT_CLASS_BY_PROPERTY } from "../lib/footprint";
 
-const words = ["tokens", "water", "energy", "carbon"] as const;
+const words = [
+  { key: "token", label: "tokens" },
+  { key: "water", label: "water" },
+  { key: "energy", label: "energy" },
+  { key: "carbon", label: "carbon" }
+] as const;
 
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -26,6 +32,7 @@ function useReducedMotion(): boolean {
 export function HeroBanner() {
   const reducedMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
+  const activeWord = words[activeIndex] ?? words[0];
 
   useEffect(() => {
     if (reducedMotion) {
@@ -45,12 +52,14 @@ export function HeroBanner() {
       <div className="relative mx-auto max-w-4xl text-center">
         <h1 className="mx-auto max-w-3xl text-4xl font-semibold tracking-[-0.05em] text-ink sm:text-5xl">
           Understand your agent{" "}
-          <span className="inline-grid min-w-[6ch] justify-items-start align-baseline text-left text-accent">
+          <span className="inline-grid min-w-[6ch] justify-items-start align-baseline text-left">
             <span
-              key={words[activeIndex]}
-              className={reducedMotion ? undefined : "hero-word"}
+              key={activeWord.key}
+              className={[FOOTPRINT_TEXT_CLASS_BY_PROPERTY[activeWord.key], reducedMotion ? undefined : "hero-word"].filter(
+                Boolean
+              ).join(" ")}
             >
-              {words[activeIndex]}
+              {activeWord.label}
             </span>
           </span>{" "}
           footprint locally.
