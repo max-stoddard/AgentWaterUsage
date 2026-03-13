@@ -1,6 +1,6 @@
 import type { Bucket, TimeseriesPoint, WaterRange } from "@agentic-insights/shared";
 import type { ClassifiedUsageEvent } from "./types.js";
-import { getBucketKey, getBucketLabel } from "./timezone.js";
+import { getBucketKeyFromStart, getBucketLabelFromStart, getBucketStartTs, getNextBucketStartTs } from "./timezone.js";
 
 function zeroRange(): WaterRange {
   return { low: 0, central: 0, high: 0 };
@@ -12,25 +12,55 @@ function addRange(target: WaterRange, source: WaterRange): void {
   target.high += source.high;
 }
 
-export function aggregateTimeseries(
-  events: ClassifiedUsageEvent[],
+function createPoint(startTs: number, bucket: Bucket, timeZone: string): TimeseriesPoint {
+  return {
+    startTs,
+    key: getBucketKeyFromStart(startTs, bucket, timeZone),
+    label: getBucketLabelFromStart(startTs, bucket, timeZone),
+    tokens: 0,
+    excludedTokens: 0,
+    unestimatedTokens: 0,
+    waterLitres: zeroRange()
+  };
+}
+
+function addPointTotals(target: TimeseriesPoint, source: Pick<TimeseriesPoint, "tokens" | "excludedTokens" | "unestimatedTokens" | "waterLitres">) {
+  target.tokens += source.tokens;
+  target.excludedTokens += source.excludedTokens;
+  target.unestimatedTokens += source.unestimatedTokens;
+  addRange(target.waterLitres, source.waterLitres);
+}
+
+function fillPoints(
+  pointsByStart: Map<number, TimeseriesPoint>,
+  firstStartTs: number,
+  lastStartTs: number,
   bucket: Bucket,
   timeZone: string
 ): TimeseriesPoint[] {
-  const points = new Map<string, TimeseriesPoint>();
+  const points: TimeseriesPoint[] = [];
+  let currentStartTs = firstStartTs;
+
+  while (currentStartTs <= lastStartTs) {
+    points.push(pointsByStart.get(currentStartTs) ?? createPoint(currentStartTs, bucket, timeZone));
+    const nextStartTs = getNextBucketStartTs(currentStartTs, bucket, timeZone);
+    if (nextStartTs <= currentStartTs) {
+      break;
+    }
+    currentStartTs = nextStartTs;
+  }
+
+  return points;
+}
+
+export function aggregateDayTimeseries(events: ClassifiedUsageEvent[], timeZone: string): TimeseriesPoint[] {
+  const pointsByStart = new Map<number, TimeseriesPoint>();
+  let firstStartTs = Number.POSITIVE_INFINITY;
+  let lastStartTs = Number.NEGATIVE_INFINITY;
 
   for (const event of events) {
-    const key = getBucketKey(event.ts, bucket, timeZone);
-    const point =
-      points.get(key) ??
-      {
-        key,
-        label: getBucketLabel(event.ts, bucket, timeZone),
-        tokens: 0,
-        excludedTokens: 0,
-        unestimatedTokens: 0,
-        waterLitres: zeroRange()
-      };
+    const startTs = getBucketStartTs(event.ts, "day", timeZone);
+    const point = pointsByStart.get(startTs) ?? createPoint(startTs, "day", timeZone);
 
     point.tokens += event.totalTokens;
     addRange(point.waterLitres, event.waterLitres);
@@ -41,8 +71,46 @@ export function aggregateTimeseries(
       point.unestimatedTokens += event.totalTokens;
     }
 
-    points.set(key, point);
+    pointsByStart.set(startTs, point);
+    firstStartTs = Math.min(firstStartTs, startTs);
+    lastStartTs = Math.max(lastStartTs, startTs);
   }
 
-  return [...points.values()].sort((a, b) => a.key.localeCompare(b.key));
+  if (pointsByStart.size === 0) {
+    return [];
+  }
+
+  return fillPoints(pointsByStart, firstStartTs, lastStartTs, "day", timeZone);
+}
+
+export function aggregateFromDayBuckets(dayPoints: TimeseriesPoint[], bucket: Bucket, timeZone: string): TimeseriesPoint[] {
+  if (bucket === "day") {
+    return dayPoints.map((point) => ({
+      ...point,
+      waterLitres: { ...point.waterLitres }
+    }));
+  }
+
+  if (dayPoints.length === 0) {
+    return [];
+  }
+
+  const pointsByStart = new Map<number, TimeseriesPoint>();
+  let firstStartTs = getBucketStartTs(dayPoints[0]!.startTs, bucket, timeZone);
+  let lastStartTs = getBucketStartTs(dayPoints[dayPoints.length - 1]!.startTs, bucket, timeZone);
+
+  for (const dayPoint of dayPoints) {
+    const startTs = getBucketStartTs(dayPoint.startTs, bucket, timeZone);
+    const point = pointsByStart.get(startTs) ?? createPoint(startTs, bucket, timeZone);
+    addPointTotals(point, dayPoint);
+    pointsByStart.set(startTs, point);
+    firstStartTs = Math.min(firstStartTs, startTs);
+    lastStartTs = Math.max(lastStartTs, startTs);
+  }
+
+  return fillPoints(pointsByStart, firstStartTs, lastStartTs, bucket, timeZone);
+}
+
+export function aggregateTimeseries(events: ClassifiedUsageEvent[], bucket: Bucket, timeZone: string): TimeseriesPoint[] {
+  return aggregateFromDayBuckets(aggregateDayTimeseries(events, timeZone), bucket, timeZone);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateTimeseries } from "../src/aggregation.js";
+import { aggregateDayTimeseries, aggregateFromDayBuckets, aggregateTimeseries } from "../src/aggregation.js";
 import type { ClassifiedUsageEvent } from "../src/types.js";
 
 function supportedEvent(id: string, ts: string, waterCentral: number): ClassifiedUsageEvent {
@@ -28,25 +28,40 @@ function supportedEvent(id: string, ts: string, waterCentral: number): Classifie
 }
 
 describe("aggregateTimeseries", () => {
-  it("reconciles day, week, and month totals", () => {
+  it("fills missing day buckets and preserves totals through week and month rollups", () => {
     const events = [
       supportedEvent("a", "2026-03-03T12:00:00.000Z", 1),
-      supportedEvent("b", "2026-03-04T12:00:00.000Z", 2),
+      supportedEvent("b", "2026-03-05T12:00:00.000Z", 2),
       supportedEvent("c", "2026-03-15T12:00:00.000Z", 3)
     ];
 
-    const day = aggregateTimeseries(events, "day", "UTC");
-    const week = aggregateTimeseries(events, "week", "UTC");
-    const month = aggregateTimeseries(events, "month", "UTC");
+    const day = aggregateDayTimeseries(events, "UTC");
+    const week = aggregateFromDayBuckets(day, "week", "UTC");
+    const month = aggregateFromDayBuckets(day, "month", "UTC");
 
     const sum = (points: typeof day) => points.reduce((total, point) => total + point.waterLitres.central, 0);
     expect(sum(day)).toBeCloseTo(sum(week), 6);
     expect(sum(day)).toBeCloseTo(sum(month), 6);
+
+    expect(day).toHaveLength(13);
+    expect(day[1]).toMatchObject({
+      key: "2026-03-04",
+      tokens: 0,
+      startTs: Date.parse("2026-03-04T00:00:00.000Z")
+    });
     expect(week[0]?.label).toMatch(/^Week of /);
+    expect(month[0]?.key).toBe("2026-03");
+  });
+
+  it("matches the compatibility aggregateTimeseries wrapper", () => {
+    const events = [supportedEvent("a", "2026-03-03T12:00:00.000Z", 1), supportedEvent("b", "2026-03-15T12:00:00.000Z", 3)];
+
+    expect(aggregateTimeseries(events, "month", "UTC")).toEqual(aggregateFromDayBuckets(aggregateDayTimeseries(events, "UTC"), "month", "UTC"));
   });
 
   it("uses timezone-aware bucket labels", () => {
-    const points = aggregateTimeseries([supportedEvent("a", "2026-03-09T00:30:00.000Z", 1)], "day", "America/Los_Angeles");
+    const points = aggregateDayTimeseries([supportedEvent("a", "2026-03-09T00:30:00.000Z", 1)], "America/Los_Angeles");
     expect(points[0]?.key).toBe("2026-03-08");
+    expect(points[0]?.label).toBe("8 Mar 2026");
   });
 });

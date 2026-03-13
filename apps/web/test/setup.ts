@@ -47,6 +47,20 @@ Object.defineProperty(HTMLElement.prototype, "clientHeight", {
   }
 });
 
+Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+  configurable: true,
+  get() {
+    return 1024;
+  }
+});
+
+Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+  configurable: true,
+  get() {
+    return 400;
+  }
+});
+
 Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
   configurable: true,
   value() {
