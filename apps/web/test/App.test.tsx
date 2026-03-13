@@ -31,6 +31,44 @@ function mockDashboardResponses() {
             prompts: 47,
             excludedModels: 2
           },
+          modelUsage: [
+            {
+              provider: "openai",
+              model: "gpt-5.4",
+              totalTokens: 950,
+              events: 10,
+              supportedTokens: 900,
+              excludedTokens: 0,
+              unestimatedTokens: 50
+            },
+            {
+              provider: "anthropic",
+              model: "claude-sonnet-4",
+              totalTokens: 120,
+              events: 3,
+              supportedTokens: 120,
+              excludedTokens: 0,
+              unestimatedTokens: 0
+            },
+            {
+              provider: "ollama",
+              model: "qwen3.5:9b",
+              totalTokens: 50,
+              events: 1,
+              supportedTokens: 0,
+              excludedTokens: 50,
+              unestimatedTokens: 0
+            },
+            {
+              provider: "openai",
+              model: "gpt-4o-mini",
+              totalTokens: 20,
+              events: 1,
+              supportedTokens: 20,
+              excludedTokens: 0,
+              unestimatedTokens: 0
+            }
+          ],
           coverageDetails: [
             {
               provider: "openai",
@@ -43,7 +81,7 @@ function mockDashboardResponses() {
             },
             {
               provider: "anthropic",
-              model: "claude-sonnet-4-20250514",
+              model: "claude-sonnet-4",
               source: "Claude Code",
               tokens: 120,
               events: 3,
@@ -106,7 +144,8 @@ function mockDashboardResponses() {
               inputUsdPerMillion: 1.75,
               cachedInputUsdPerMillion: 0.175,
               outputUsdPerMillion: 14,
-              docsUrl: "https://openai.com/api/pricing/"
+              sourceUrl: "https://raw.githubusercontent.com/Portkey-AI/models/main/pricing/openai.json",
+              sourceLabel: "Portkey pricing: openai.json"
             },
             {
               provider: "anthropic",
@@ -114,7 +153,8 @@ function mockDashboardResponses() {
               inputUsdPerMillion: 3,
               cachedInputUsdPerMillion: 0.3,
               outputUsdPerMillion: 15,
-              docsUrl: "https://docs.anthropic.com/en/docs/about-claude/pricing"
+              sourceUrl: "https://raw.githubusercontent.com/Portkey-AI/models/main/pricing/anthropic.json",
+              sourceLabel: "Portkey pricing: anthropic.json"
             }
           ],
           benchmarkCoefficients: {
@@ -129,18 +169,32 @@ function mockDashboardResponses() {
             supportedMedianSource: "local_median_event_cost_usd"
           },
           exclusions: [],
-          sourceLinks: [
-            {
-              label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)",
-              url: "https://doi.org/10.1145/3724499"
-            },
-            {
-              label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
-              url: "https://arxiv.org/abs/2304.03271"
-            },
-            { label: "OpenAI API pricing", url: "https://openai.com/api/pricing/" },
-            { label: "Anthropic API pricing", url: "https://docs.anthropic.com/en/docs/about-claude/pricing" }
-          ]
+          pricingCatalog: {
+            generatedAt: "2026-03-13T12:00:00.000Z",
+            sourceRepoUrl: "https://github.com/Portkey-AI/models",
+            sourceDirectoryUrl: "https://github.com/Portkey-AI/models/tree/main/pricing",
+            licenseUrl: "https://raw.githubusercontent.com/Portkey-AI/models/main/LICENSE",
+            providerCount: 39,
+            modelCount: 1971
+          },
+          sourcesByTab: {
+            prompts: [
+              { label: "Portkey models repo (MIT)", url: "https://github.com/Portkey-AI/models" },
+              { label: "Portkey MIT license", url: "https://raw.githubusercontent.com/Portkey-AI/models/main/LICENSE" }
+            ],
+            water: [
+              {
+                label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)",
+                url: "https://doi.org/10.1145/3724499"
+              }
+            ],
+            energy: [
+              { label: "CodeCarbon methodology", url: "https://mlco2.github.io/codecarbon/methodology.html" }
+            ],
+            carbon: [
+              { label: "GHG Protocol Corporate Standard", url: "https://ghgprotocol.org/corporate-standard" }
+            ]
+          }
         }),
         { status: 200 }
       );
@@ -278,7 +332,7 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Day" })).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByTestId("water-chart")).toBeInTheDocument();
 
-    const breakdownHeading = screen.getByText("Usage breakdown");
+    const breakdownHeading = screen.getByText("Agent usage by model");
     const breakdownSection = breakdownHeading.closest("section");
     expect(breakdownSection).not.toBeNull();
     expect(screen.getByText("sessions")).toBeInTheDocument();
@@ -370,22 +424,35 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Energy" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Carbon" })).toBeInTheDocument();
     expect(screen.getByText(/Sessions are distinct Codex and Claude Code runs/i)).toBeInTheDocument();
+    expect(screen.getByText(/Bundled pricing snapshot/i)).toBeInTheDocument();
+    expect(screen.getByText(/eventCostUsd = input\/1e6/i)).toBeInTheDocument();
+    expect(await screen.findByText(/gpt-5.2-codex/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Portkey models repo \(MIT\)/i })).toHaveAttribute(
+      "href",
+      "https://github.com/Portkey-AI/models"
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Energy" }));
     expect(screen.getByText(/Energy estimates are not live yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /CodeCarbon methodology/i })).toHaveAttribute(
+      "href",
+      "https://mlco2.github.io/codecarbon/methodology.html"
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Carbon" }));
     expect(screen.getByText(/Carbon estimates are also still upcoming/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /GHG Protocol Corporate Standard/i })).toHaveAttribute(
+      "href",
+      "https://ghgprotocol.org/corporate-standard"
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Water" }));
-
-    expect(await screen.findByText(/gpt-5.2-codex/i)).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /CACM DOI: Making AI Less 'Thirsty' \(Li, Yang, Islam, Ren\)/i })
     ).toHaveAttribute("href", "https://doi.org/10.1145/3724499");
   });
 
-  it("shows per-model coverage details with sources in the expanded summary", async () => {
+  it("shows ranked model usage in the expanded summary", async () => {
     mockDashboardResponses();
 
     render(<App />);
@@ -394,25 +461,20 @@ describe("App", () => {
       expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
     });
 
-    expect(screen.getByText("Usage breakdown")).toBeInTheDocument();
-    expect(screen.getByText("See how many prompts and sessions were counted, how many tokens are included in the estimate, and which model sources are driving the total.")).toBeInTheDocument();
+    expect(screen.getByText("Agent usage by model")).toBeInTheDocument();
+    expect(screen.getByText("See how many sessions and prompts were counted, how many priced tokens were included, and which models are driving the most local agent usage.")).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText("47")).toBeInTheDocument();
     expect(screen.getByText("900")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Show all model sources/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Show all models/i }));
 
-    expect(screen.getAllByText("openai / gpt-5.4")).toHaveLength(2);
-    expect(screen.getByText("anthropic / claude-sonnet-4-20250514")).toBeInTheDocument();
-    expect(screen.getByText("Claude Code · 120 tokens")).toBeInTheDocument();
-    expect(screen.getByText("VS Code extension · 900 tokens")).toBeInTheDocument();
-    expect(screen.getByText("CLI · 50 tokens — unsupported provider: ollama")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "CLI · 50 tokens — token totals are available, but token splits needed for pricing-weighted estimation are missing."
-      )
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Show fewer sources/i })).toBeInTheDocument();
+    expect(screen.getAllByText("openai / gpt-5.4")).toHaveLength(1);
+    expect(screen.getByText("anthropic / claude-sonnet-4")).toBeInTheDocument();
+    expect(screen.getByText("950 tokens · 900 estimated · 50 token-only")).toBeInTheDocument();
+    expect(screen.getByText("50 tokens · 50 excluded")).toBeInTheDocument();
+    expect(screen.getByText("openai / gpt-4o-mini")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Show fewer models/i })).toBeInTheDocument();
   });
 
   it("shows neutral onboarding guidance when no local usage history is available", async () => {
@@ -442,6 +504,7 @@ describe("App", () => {
               prompts: 0,
               excludedModels: 0
             },
+            modelUsage: [],
             coverageDetails: [],
             diagnostics: {
               state: "no_data",
@@ -495,6 +558,7 @@ describe("App", () => {
               prompts: 0,
               excludedModels: 0
             },
+            modelUsage: [],
             coverageDetails: [],
             diagnostics: {
               state: "read_error",

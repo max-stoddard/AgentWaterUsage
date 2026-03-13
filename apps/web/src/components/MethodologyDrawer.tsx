@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import type { MethodologyResponse, OverviewResponse } from "@agentic-insights/shared";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { MethodologyResponse, MethodologyTabId, OverviewResponse } from "@agentic-insights/shared";
 import { formatLitres, formatNumber } from "../lib/format";
+import { ModelUsageList } from "./ModelUsageList";
 import { SkeletonBlock } from "./SkeletonBlock";
+import { UsageSummaryMetrics } from "./UsageSummaryMetrics";
 
 interface MethodologyDrawerProps {
   open: boolean;
@@ -11,18 +13,38 @@ interface MethodologyDrawerProps {
   onClose: () => void;
 }
 
-type MethodologyTab = "prompts" | "water" | "energy" | "carbon";
-
-const tabs: Array<{ id: MethodologyTab; label: string }> = [
+const tabs: Array<{ id: MethodologyTabId; label: string }> = [
   { id: "prompts", label: "Prompts" },
   { id: "water", label: "Water" },
   { id: "energy", label: "Energy" },
   { id: "carbon", label: "Carbon" }
 ];
 
+function formatUsdPerMillion(value: number): string {
+  return `$${value.toLocaleString("en-US", {
+    minimumFractionDigits: value % 1 === 0 ? 0 : 3,
+    maximumFractionDigits: 6
+  })}`;
+}
+
+function formatGeneratedAt(value: string): string {
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  }).format(parsed);
+}
+
 export function MethodologyDrawer({ open, methodology, overview, loading, onClose }: MethodologyDrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<MethodologyTab>("prompts");
+  const [activeTab, setActiveTab] = useState<MethodologyTabId>("prompts");
+  const [selectedProvider, setSelectedProvider] = useState("all");
+  const [searchValue, setSearchValue] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -49,17 +71,76 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
   }, [open]);
 
   useEffect(() => {
-    if (open) {
-      setActiveTab("prompts");
+    if (!open) {
+      return;
     }
+
+    setActiveTab("prompts");
+    setSelectedProvider("all");
+    setSearchValue("");
   }, [open]);
+
+  const providers = useMemo(() => {
+    if (!methodology) {
+      return [];
+    }
+
+    return [...new Set(methodology.pricingTable.map((entry) => entry.provider))].sort((left, right) =>
+      left.localeCompare(right)
+    );
+  }, [methodology]);
+
+  const filteredPricingTable = useMemo(() => {
+    if (!methodology) {
+      return [];
+    }
+
+    const query = searchValue.trim().toLowerCase();
+    return methodology.pricingTable.filter((entry) => {
+      if (selectedProvider !== "all" && entry.provider !== selectedProvider) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return entry.model.includes(query) || entry.provider.includes(query);
+    });
+  }, [methodology, searchValue, selectedProvider]);
 
   if (!open) return null;
 
   const hasExceptions = overview
     ? overview.exclusions.length > 0 || overview.tokenTotals.unestimatedTokens > 0
     : false;
-  const topModelSources = overview?.coverageDetails.slice(0, 3) ?? [];
+  const topModels = overview?.modelUsage.slice(0, 3) ?? [];
+  const activeSources = methodology?.sourcesByTab[activeTab] ?? [];
+
+  function renderSources() {
+    if (activeSources.length === 0) {
+      return null;
+    }
+
+    return (
+      <section>
+        <h3 className="text-sm font-semibold text-ink">Sources</h3>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {activeSources.map((link) => (
+            <a
+              key={link.url}
+              href={link.url}
+              target="_blank"
+              rel="noreferrer"
+              className="pill no-underline transition-colors hover:bg-accent-muted hover:text-accent-hover"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50">
@@ -75,7 +156,7 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
         aria-modal="true"
         aria-label="How it works"
         tabIndex={-1}
-        className="absolute bottom-0 right-0 top-0 flex w-full max-w-lg flex-col bg-white shadow-2xl outline-none transition-transform duration-300"
+        className="absolute bottom-0 right-0 top-0 flex w-full max-w-2xl flex-col bg-white shadow-2xl outline-none transition-transform duration-300"
       >
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200/60 bg-white px-6 py-4">
           <h2 className="text-base font-semibold text-ink">How it works</h2>
@@ -120,33 +201,22 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                 <div className="space-y-6">
                   <section>
                     <p className="text-[15px] leading-relaxed text-ink-secondary">
-                      Prompts show how much local agent activity the dashboard could read, even when some models could
-                      not be priced for water estimates yet.
+                      Prompts show how much local agent activity the dashboard could read and how that activity maps to
+                      the bundled Portkey pricing snapshot used for model-cost weighting.
+                    </p>
+                    <p className="mt-3 text-sm leading-relaxed text-ink-secondary">
+                      Bundled pricing snapshot: {formatNumber(methodology.pricingCatalog.modelCount)} text-token model
+                      entries across {formatNumber(methodology.pricingCatalog.providerCount)} providers, generated{" "}
+                      {formatGeneratedAt(methodology.pricingCatalog.generatedAt)}.
                     </p>
                   </section>
 
-                  <section>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-lg bg-surface-muted px-3 py-3">
-                        <p className="text-xs text-ink-tertiary">Sessions</p>
-                        <p className="mt-1 text-sm font-semibold text-ink">
-                          {formatNumber(overview?.coverageSummary.sessions ?? 0)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-surface-muted px-3 py-3">
-                        <p className="text-xs text-ink-tertiary">Prompts</p>
-                        <p className="mt-1 text-sm font-semibold text-ink">
-                          {formatNumber(overview?.coverageSummary.prompts ?? 0)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-surface-muted px-3 py-3">
-                        <p className="text-xs text-ink-tertiary">Excluded models</p>
-                        <p className="mt-1 text-sm font-semibold text-ink">
-                          {formatNumber(overview?.coverageSummary.excludedModels ?? 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </section>
+                  <UsageSummaryMetrics
+                    sessions={overview?.coverageSummary.sessions ?? 0}
+                    prompts={overview?.coverageSummary.prompts ?? 0}
+                    tokens={overview?.tokenTotals.supportedTokens ?? 0}
+                    compact={false}
+                  />
 
                   <section>
                     <h3 className="text-sm font-semibold text-ink">What counts</h3>
@@ -156,32 +226,98 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                         logs, not just the turns that had enough token detail for water estimation.
                       </p>
                       <p>
-                        Model sources are grouped by provider, model, and where the activity came from. The card shows
-                        the heaviest model sources first so you can spot what is driving token usage quickly.
+                        Agent usage is grouped by canonical provider and model so repeated dated Claude IDs roll up into
+                        one model row instead of fragmenting the ranking.
                       </p>
                     </div>
                   </section>
 
-                  {topModelSources.length > 0 ? (
+                  {topModels.length > 0 ? (
                     <section>
-                      <h3 className="text-sm font-semibold text-ink">Top model sources</h3>
-                      <div className="mt-3 space-y-2">
-                        {topModelSources.map((item) => (
-                          <div
-                            key={`${item.provider}:${item.model}:${item.source}`}
-                            className="rounded-lg bg-surface-muted px-4 py-3"
-                          >
-                            <p className="text-sm font-medium text-ink">
-                              {item.provider} / {item.model}
-                            </p>
-                            <p className="mt-0.5 text-sm text-ink-secondary">
-                              {item.source} · {formatNumber(item.tokens)} tokens
-                            </p>
-                          </div>
-                        ))}
+                      <h3 className="text-sm font-semibold text-ink">Agent usage by model</h3>
+                      <div className="mt-3">
+                        <ModelUsageList items={topModels} />
                       </div>
                     </section>
                   ) : null}
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Model-cost formula</h3>
+                    <div className="mt-3 space-y-2">
+                      <code className="block overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-xs leading-6 text-slate-100">
+                        eventCostUsd = input/1e6 * inputPrice + cachedInput/1e6 * cachedInputPrice + output/1e6 * outputPrice
+                      </code>
+                    </div>
+                  </section>
+
+                  <section>
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <label className="flex-1">
+                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-ink-tertiary">
+                          Search models
+                        </span>
+                        <input
+                          type="search"
+                          value={searchValue}
+                          onChange={(event) => setSearchValue(event.target.value)}
+                          placeholder="Search provider or model"
+                          className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-accent"
+                        />
+                      </label>
+                      <label className="sm:w-48">
+                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-ink-tertiary">
+                          Provider
+                        </span>
+                        <select
+                          value={selectedProvider}
+                          onChange={(event) => setSelectedProvider(event.target.value)}
+                          className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-accent"
+                        >
+                          <option value="all">All providers</option>
+                          {providers.map((provider) => (
+                            <option key={provider} value={provider}>
+                              {provider}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </section>
+
+                  <section>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-ink">Priced model catalog</h3>
+                      <p className="text-xs text-ink-tertiary">
+                        Showing {formatNumber(filteredPricingTable.length)} of {formatNumber(methodology.pricingTable.length)} models
+                      </p>
+                    </div>
+                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200/60">
+                      <div className="max-h-[26rem] overflow-auto">
+                        <table className="min-w-full border-collapse text-left text-sm">
+                          <thead className="sticky top-0 bg-surface-muted text-xs font-medium text-ink-secondary">
+                            <tr>
+                              <th className="px-3 py-2.5 font-medium">Provider</th>
+                              <th className="px-3 py-2.5 font-medium">Model</th>
+                              <th className="px-3 py-2.5 font-medium">Input</th>
+                              <th className="px-3 py-2.5 font-medium">Cached</th>
+                              <th className="px-3 py-2.5 font-medium">Output</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredPricingTable.map((entry) => (
+                              <tr key={`${entry.provider}:${entry.model}`} className="border-t border-slate-200/60">
+                                <td className="px-3 py-2.5 font-medium text-ink">{entry.provider}</td>
+                                <td className="px-3 py-2.5 text-ink-secondary">{entry.model}</td>
+                                <td className="px-3 py-2.5 text-ink-secondary">{formatUsdPerMillion(entry.inputUsdPerMillion)}</td>
+                                <td className="px-3 py-2.5 text-ink-secondary">{formatUsdPerMillion(entry.cachedInputUsdPerMillion)}</td>
+                                <td className="px-3 py-2.5 text-ink-secondary">{formatUsdPerMillion(entry.outputUsdPerMillion)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </section>
 
                   {overview && hasExceptions ? (
                     <section>
@@ -203,6 +339,8 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                       </div>
                     </section>
                   ) : null}
+
+                  {renderSources()}
                 </div>
               ) : null}
 
@@ -210,7 +348,7 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                 <div className="space-y-8">
                   <section>
                     <p className="text-[15px] leading-relaxed text-ink-secondary">
-                      Water estimates are calculated from your local coding agent token activity using pricing-weighted
+                      Water estimates are calculated from local coding-agent token activity using pricing-weighted
                       normalization and published benchmark coefficients.
                     </p>
                   </section>
@@ -218,9 +356,6 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                   <section>
                     <h3 className="text-sm font-semibold text-ink">Formulas</h3>
                     <div className="mt-3 space-y-2">
-                      <code className="block overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-xs leading-6 text-slate-100">
-                        eventCostUsd = input/1e6 * inputPrice + cachedInput/1e6 * cachedInputPrice + output/1e6 * outputPrice
-                      </code>
                       <code className="block overflow-x-auto rounded-lg bg-surface-muted px-4 py-3 text-xs leading-6 text-ink-secondary">
                         waterLitres = eventCostUsd / referenceEventCostUsd * benchmarkCoefficient
                       </code>
@@ -261,34 +396,6 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                     </div>
                   </section>
 
-                  <section>
-                    <h3 className="text-sm font-semibold text-ink">Pricing table</h3>
-                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200/60">
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full border-collapse text-left text-sm">
-                          <thead className="bg-surface-muted text-xs font-medium text-ink-secondary">
-                            <tr>
-                              <th className="px-3 py-2.5 font-medium">Model</th>
-                              <th className="px-3 py-2.5 font-medium">Input</th>
-                              <th className="px-3 py-2.5 font-medium">Cached</th>
-                              <th className="px-3 py-2.5 font-medium">Output</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {methodology.pricingTable.map((entry) => (
-                              <tr key={entry.model} className="border-t border-slate-200/60">
-                                <td className="px-3 py-2.5 font-medium text-ink">{entry.model}</td>
-                                <td className="px-3 py-2.5 text-ink-secondary">${entry.inputUsdPerMillion}</td>
-                                <td className="px-3 py-2.5 text-ink-secondary">${entry.cachedInputUsdPerMillion}</td>
-                                <td className="px-3 py-2.5 text-ink-secondary">${entry.outputUsdPerMillion}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </section>
-
                   {overview && hasExceptions ? (
                     <section>
                       <h3 className="text-sm font-semibold text-ink">Exclusions</h3>
@@ -321,50 +428,41 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                     </section>
                   ) : null}
 
-                  {methodology.sourceLinks.length > 0 ? (
-                    <section>
-                      <h3 className="text-sm font-semibold text-ink">Sources</h3>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {methodology.sourceLinks.map((link) => (
-                          <a
-                            key={link.url}
-                            href={link.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="pill no-underline transition-colors hover:bg-accent-muted hover:text-accent-hover"
-                          >
-                            {link.label}
-                          </a>
-                        ))}
-                      </div>
-                    </section>
-                  ) : null}
+                  {renderSources()}
                 </div>
               ) : null}
 
               {activeTab === "energy" ? (
-                <section className="space-y-3">
-                  <p className="text-[15px] leading-relaxed text-ink-secondary">
-                    Energy estimates are not live yet. This tab will eventually explain how token activity maps to an
-                    electricity estimate without hiding the uncertainty behind the calculation.
-                  </p>
-                  <div className="rounded-lg bg-surface-muted px-4 py-3 text-sm leading-relaxed text-ink-secondary">
-                    For now, water is the only fully implemented footprint estimate in this dashboard.
-                  </div>
-                </section>
+                <div className="space-y-6">
+                  <section className="space-y-3">
+                    <p className="text-[15px] leading-relaxed text-ink-secondary">
+                      Energy estimates are not live yet. This tab will explain how token activity maps to electricity
+                      use once the model is implemented.
+                    </p>
+                    <div className="rounded-lg bg-surface-muted px-4 py-3 text-sm leading-relaxed text-ink-secondary">
+                      For now, water is the only fully implemented footprint estimate in this dashboard.
+                    </div>
+                  </section>
+
+                  {renderSources()}
+                </div>
               ) : null}
 
               {activeTab === "carbon" ? (
-                <section className="space-y-3">
-                  <p className="text-[15px] leading-relaxed text-ink-secondary">
-                    Carbon estimates are also still upcoming. When this lands, it will sit alongside water and energy
-                    so you can compare the same local usage across multiple footprint views.
-                  </p>
-                  <div className="rounded-lg bg-surface-muted px-4 py-3 text-sm leading-relaxed text-ink-secondary">
-                    Nothing is being estimated for carbon yet, so this tab is intentionally descriptive rather than
-                    formula-driven.
-                  </div>
-                </section>
+                <div className="space-y-6">
+                  <section className="space-y-3">
+                    <p className="text-[15px] leading-relaxed text-ink-secondary">
+                      Carbon estimates are also still upcoming. When this lands, it will sit alongside water and energy
+                      so you can compare the same local usage across multiple footprint views.
+                    </p>
+                    <div className="rounded-lg bg-surface-muted px-4 py-3 text-sm leading-relaxed text-ink-secondary">
+                      Nothing is being estimated for carbon yet, so this tab is intentionally descriptive rather than
+                      formula-driven.
+                    </div>
+                  </section>
+
+                  {renderSources()}
+                </div>
               ) : null}
             </div>
           )}

@@ -1,4 +1,13 @@
-import type { CalibrationSnapshot, CoverageClassification, OverviewDiagnostics, PricingEntry, WaterRange } from "@agentic-insights/shared";
+import type {
+  CalibrationSnapshot,
+  CoverageClassification,
+  MethodologySourceLink,
+  MethodologyTabId,
+  OverviewDiagnostics,
+  PricingCatalogMetadata,
+  PricingEntry,
+  WaterRange
+} from "@agentic-insights/shared";
 
 export interface FileRecord {
   path: string;
@@ -60,7 +69,8 @@ export interface DataSnapshot {
   coverageDetails: CoverageDetailAggregate[];
   exclusions: ExclusionAggregate[];
   pricingTable: PricingEntry[];
-  sourceLinks: Array<{ label: string; url: string }>;
+  pricingCatalog: PricingCatalogMetadata;
+  sourcesByTab: Record<MethodologyTabId, MethodologySourceLink[]>;
   benchmarks: WaterRange;
   calibration: CalibrationSnapshot | null;
   lastIndexedAt: number | null;

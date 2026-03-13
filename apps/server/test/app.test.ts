@@ -203,6 +203,22 @@ describe("API routes", () => {
       prompts: 2,
       excludedModels: 2
     });
+    expect(overview.modelUsage).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          provider: "openai",
+          model: "gpt-5.3-codex",
+          totalTokens: 120,
+          supportedTokens: 120
+        }),
+        expect.objectContaining({
+          provider: "anthropic",
+          model: "claude-sonnet-4",
+          totalTokens: 80,
+          supportedTokens: 80
+        })
+      ])
+    );
     expect(overview.coverageDetails).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -214,7 +230,7 @@ describe("API routes", () => {
         }),
         expect.objectContaining({
           provider: "anthropic",
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4",
           source: "Claude Code",
           classification: "supported",
           tokens: 80
@@ -265,13 +281,26 @@ describe("API routes", () => {
       high: 0.029926
     });
     expect(methodology.exclusions).toHaveLength(2);
-    expect(methodology.sourceLinks).toEqual(
+    expect(methodology.pricingCatalog).toEqual(
+      expect.objectContaining({
+        sourceRepoUrl: "https://github.com/Portkey-AI/models"
+      })
+    );
+    expect(methodology.sourcesByTab.water).toEqual(
       expect.arrayContaining([
         { label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)", url: "https://doi.org/10.1145/3724499" },
         {
           label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
           url: "https://arxiv.org/abs/2304.03271"
         }
+      ])
+    );
+    expect(methodology.sourcesByTab.prompts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "Portkey models repo (MIT)",
+          url: "https://github.com/Portkey-AI/models"
+        })
       ])
     );
 

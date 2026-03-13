@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { OverviewResponse } from "@agentic-insights/shared";
-import { formatCompactNumber, formatNumber } from "../lib/format";
+import { ModelUsageList } from "./ModelUsageList";
+import { UsageSummaryMetrics } from "./UsageSummaryMetrics";
 
 interface CoverageSummaryProps {
   overview: OverviewResponse;
@@ -8,47 +9,19 @@ interface CoverageSummaryProps {
 }
 
 export function CoverageSummary({ overview, onOpenMethodology }: CoverageSummaryProps) {
-  const [showAllSources, setShowAllSources] = useState(false);
-  const hasDetails = overview.coverageDetails.length > 0;
-  const topDetails = overview.coverageDetails.slice(0, 3);
-  const remainingDetails = overview.coverageDetails.slice(3);
-
-  function renderDetailCard(item: OverviewResponse["coverageDetails"][number]) {
-    return (
-      <div
-        key={`${item.provider}:${item.model}:${item.source}:${item.classification}:${item.reason ?? "supported"}`}
-        className="flex items-start gap-3 rounded-lg bg-surface-muted px-4 py-3"
-      >
-        <div
-          className={`mt-0.5 h-8 w-1 flex-shrink-0 rounded-full ${
-            item.classification === "supported"
-              ? "bg-emerald-500"
-              : item.classification === "excluded"
-                ? "bg-accent"
-                : "bg-ink-tertiary"
-          }`}
-        />
-        <div>
-          <p className="text-sm font-medium text-ink">
-            {item.provider} / {item.model}
-          </p>
-          <p className="mt-0.5 text-sm text-ink-secondary">
-            {item.source} · {formatNumber(item.tokens)} tokens
-            {item.reason ? ` — ${item.reason.toLowerCase()}` : ""}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const [showAllModels, setShowAllModels] = useState(false);
+  const hasModelUsage = overview.modelUsage.length > 0;
+  const topModels = overview.modelUsage.slice(0, 3);
+  const remainingModels = overview.modelUsage.slice(3);
 
   return (
     <section className="card px-6 py-5 sm:px-8 sm:py-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-ink">Usage breakdown</h2>
+          <h2 className="text-base font-semibold text-ink">Agent usage by model</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-secondary">
-            See how many prompts and sessions were counted, how many tokens are included in the estimate, and which
-            model sources are driving the total.
+            See how many sessions and prompts were counted, how many priced tokens were included, and which models are
+            driving the most local agent usage.
           </p>
         </div>
         <button
@@ -60,51 +33,28 @@ export function CoverageSummary({ overview, onOpenMethodology }: CoverageSummary
         </button>
       </div>
 
-      <div className="mt-5 flex flex-col gap-4 text-sm sm:flex-row sm:items-center sm:gap-6">
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold tracking-[-0.03em] text-ink">
-            {formatCompactNumber(overview.coverageSummary.sessions)}
-          </span>
-          <span className="text-ink-secondary">sessions</span>
-        </div>
+      <UsageSummaryMetrics
+        sessions={overview.coverageSummary.sessions}
+        prompts={overview.coverageSummary.prompts}
+        tokens={overview.tokenTotals.supportedTokens}
+      />
 
-        <span className="hidden h-4 w-px bg-slate-200 sm:block" />
-
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold tracking-[-0.03em] text-ink">
-            {formatCompactNumber(overview.coverageSummary.prompts)}
-          </span>
-          <span className="text-ink-secondary">prompts</span>
-        </div>
-
-        <span className="hidden h-4 w-px bg-slate-200 sm:block" />
-
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold tracking-[-0.03em] text-ink">
-            {formatCompactNumber(overview.tokenTotals.supportedTokens)}
-          </span>
-          <span className="text-ink-secondary">tokens</span>
-        </div>
-      </div>
-
-      {hasDetails ? (
+      {hasModelUsage ? (
         <div className="mt-5">
-          <div className="space-y-2">
-            {topDetails.map(renderDetailCard)}
-          </div>
+          <ModelUsageList items={topModels} />
 
-          {remainingDetails.length > 0 ? (
+          {remainingModels.length > 0 ? (
             <div className="mt-4">
               <button
                 type="button"
-                onClick={() => setShowAllSources(!showAllSources)}
+                onClick={() => setShowAllModels(!showAllModels)}
                 className="flex items-center gap-1.5 text-sm font-medium text-accent no-underline transition-colors hover:text-accent-hover"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 16 16"
                   fill="currentColor"
-                  className={`h-3.5 w-3.5 transition-transform duration-200 ${showAllSources ? "rotate-90" : ""}`}
+                  className={`h-3.5 w-3.5 transition-transform duration-200 ${showAllModels ? "rotate-90" : ""}`}
                 >
                   <path
                     fillRule="evenodd"
@@ -112,16 +62,16 @@ export function CoverageSummary({ overview, onOpenMethodology }: CoverageSummary
                     clipRule="evenodd"
                   />
                 </svg>
-                {showAllSources ? "Show fewer sources" : "Show all model sources"}
+                {showAllModels ? "Show fewer models" : "Show all models"}
               </button>
 
-              {showAllSources ? <div className="mt-3 space-y-2">{remainingDetails.map(renderDetailCard)}</div> : null}
+              {showAllModels ? <div className="mt-3"><ModelUsageList items={remainingModels} /></div> : null}
             </div>
           ) : null}
         </div>
       ) : (
         <p className="mt-4 text-sm text-ink-secondary">
-          No model sources have been indexed yet.
+          No priced model usage has been indexed yet.
         </p>
       )}
     </section>

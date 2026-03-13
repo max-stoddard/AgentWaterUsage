@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getOrCreateCalibration } from "../src/calibration.js";
-import { BENCHMARK_COEFFICIENTS, calculateEventCostUsd, getMethodologySourceLinks, getPricingEntry } from "../src/pricing.js";
+import {
+  BENCHMARK_COEFFICIENTS,
+  PRICING_CATALOG_METADATA,
+  calculateEventCostUsd,
+  getMethodologySourcesByTab,
+  getPricingEntry
+} from "../src/pricing.js";
 import { createCacheDir } from "./helpers.js";
 
 let previousCacheDir: string | undefined;
@@ -40,6 +46,12 @@ describe("pricing methodology", () => {
     expect(pricing?.inputUsdPerMillion).toBe(3);
   });
 
+  it("normalizes dated Claude 4.5 and 4.6 model ids", () => {
+    expect(getPricingEntry("claude", "claude-sonnet-4-5-20250929")?.model).toBe("claude-sonnet-4-5");
+    expect(getPricingEntry("claude", "claude-haiku-4-5-20251001")?.model).toBe("claude-haiku-4-5");
+    expect(getPricingEntry("claude", "claude-opus-4-6")?.model).toBe("claude-opus-4-6");
+  });
+
   it("returns null for unsupported models", () => {
     expect(getPricingEntry("ollama", "qwen3.5:9b")).toBeNull();
   });
@@ -63,9 +75,27 @@ describe("pricing methodology", () => {
     });
   });
 
-  it("includes academic benchmark source links", () => {
-    const sourceLinks = getMethodologySourceLinks();
-    expect(sourceLinks).toEqual(
+  it("exposes catalog provenance and tab-scoped methodology sources", () => {
+    expect(PRICING_CATALOG_METADATA.providerCount).toBeGreaterThan(0);
+    expect(PRICING_CATALOG_METADATA.modelCount).toBeGreaterThan(0);
+
+    const sources = getMethodologySourcesByTab(["anthropic", "openai"]);
+    expect(sources.prompts).toEqual(
+      expect.arrayContaining([
+        {
+          label: "Portkey models repo (MIT)",
+          url: "https://github.com/Portkey-AI/models"
+        },
+        {
+          label: "Portkey MIT license",
+          url: "https://raw.githubusercontent.com/Portkey-AI/models/main/LICENSE"
+        },
+        expect.objectContaining({
+          label: "Portkey pricing: anthropic.json"
+        })
+      ])
+    );
+    expect(sources.water).toEqual(
       expect.arrayContaining([
         {
           label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)",
@@ -74,10 +104,6 @@ describe("pricing methodology", () => {
         {
           label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
           url: "https://arxiv.org/abs/2304.03271"
-        },
-        {
-          label: "Anthropic API pricing",
-          url: "https://docs.anthropic.com/en/docs/about-claude/pricing"
         }
       ])
     );

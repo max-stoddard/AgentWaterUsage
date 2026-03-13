@@ -3,6 +3,7 @@ import type {
   Bucket,
   CoverageClassification,
   MethodologyResponse,
+  ModelUsageEntry,
   OverviewDiagnostics,
   OverviewResponse,
   TimeseriesPoint,
@@ -15,7 +16,15 @@ import { getTuiLogPath, listClaudeProjectFiles, listClaudeSessionMetaFiles, list
 import { getCodexHomeConfig, getDefaultClaudeHome } from "./paths.js";
 import { parseSessionFile, parseSessionPrompts, parseTuiFallback } from "./parser.js";
 import { aggregateDayTimeseries, aggregateFromDayBuckets } from "./aggregation.js";
-import { BENCHMARK_COEFFICIENTS, PRICING_TABLE, calculateEventCostUsd, getMethodologySourceLinks, getPricingEntry } from "./pricing.js";
+import {
+  BENCHMARK_COEFFICIENTS,
+  PRICING_CATALOG_METADATA,
+  PRICING_TABLE,
+  calculateEventCostUsd,
+  canonicalizePricingIdentity,
+  getMethodologySourcesByTab,
+  getPricingEntry
+} from "./pricing.js";
 import type { ClassifiedUsageEvent, CoverageDetailAggregate, DataSnapshot, PromptRecord, RawUsageEvent } from "./types.js";
 
 function zeroRange(): WaterRange {
@@ -79,7 +88,8 @@ function createSnapshot(signature: string, diagnostics: OverviewDiagnostics): Da
     coverageDetails: [],
     exclusions: [],
     pricingTable: PRICING_TABLE,
-    sourceLinks: getMethodologySourceLinks(),
+    pricingCatalog: PRICING_CATALOG_METADATA,
+    sourcesByTab: getMethodologySourcesByTab([]),
     benchmarks: BENCHMARK_COEFFICIENTS,
     calibration: null,
     lastIndexedAt: null,
@@ -134,11 +144,12 @@ function addCoverageDetail(
   classification: CoverageClassification,
   reason: string | null
 ): void {
+  const canonicalIdentity = canonicalizePricingIdentity(event.provider, event.model);
   const source = formatSourceLabel(event.source);
-  const key = [event.provider, event.model, source, classification, reason ?? ""].join("|");
+  const key = [canonicalIdentity.provider, canonicalIdentity.model, source, classification, reason ?? ""].join("|");
   const current = details.get(key) ?? {
-    provider: event.provider,
-    model: event.model,
+    provider: canonicalIdentity.provider,
+    model: canonicalIdentity.model,
     source,
     tokens: 0,
     events: 0,
@@ -153,6 +164,44 @@ function addCoverageDetail(
 
 function getMonitoredDataPath(codexHome: string, claudeHome: string): string {
   return `${codexHome}\n${claudeHome}`;
+}
+
+function buildModelUsage(coverageDetails: CoverageDetailAggregate[]): ModelUsageEntry[] {
+  const usage = new Map<string, ModelUsageEntry>();
+
+  for (const detail of coverageDetails) {
+    const key = `${detail.provider}:${detail.model}`;
+    const current = usage.get(key) ?? {
+      provider: detail.provider,
+      model: detail.model,
+      totalTokens: 0,
+      events: 0,
+      supportedTokens: 0,
+      excludedTokens: 0,
+      unestimatedTokens: 0
+    };
+
+    current.totalTokens += detail.tokens;
+    current.events += detail.events;
+
+    if (detail.classification === "supported") {
+      current.supportedTokens += detail.tokens;
+    } else if (detail.classification === "excluded") {
+      current.excludedTokens += detail.tokens;
+    } else {
+      current.unestimatedTokens += detail.tokens;
+    }
+
+    usage.set(key, current);
+  }
+
+  return [...usage.values()].sort((left, right) => {
+    if (right.totalTokens !== left.totalTokens) {
+      return right.totalTokens - left.totalTokens;
+    }
+
+    return `${left.provider}:${left.model}`.localeCompare(`${right.provider}:${right.model}`);
+  });
 }
 
 function classifyEvents(rawEvents: RawUsageEvent[], signature: string): Pick<DataSnapshot, "events" | "coverageDetails" | "exclusions" | "calibration"> {
@@ -198,10 +247,11 @@ function classifyEvents(rawEvents: RawUsageEvent[], signature: string): Pick<Dat
 
     const pricing = getPricingEntry(event.provider, event.model);
     if (!pricing) {
+      const canonicalIdentity = canonicalizePricingIdentity(event.provider, event.model);
       const reason =
         event.provider !== "openai" && event.provider !== "anthropic" && event.provider !== "claude"
           ? `Unsupported provider: ${event.provider}`
-          : `Unsupported model: ${event.model}`;
+          : `Unsupported model: ${canonicalIdentity.model}`;
       addCoverageDetail(coverageDetails, event, "excluded", reason);
 
       return {
@@ -310,6 +360,7 @@ export class DashboardService {
         prompts: snapshot.promptRecords.length,
         excludedModels: snapshot.coverageDetails.filter((item) => item.classification === "excluded").length
       },
+      modelUsage: buildModelUsage(snapshot.coverageDetails),
       coverageDetails: snapshot.coverageDetails,
       exclusions: snapshot.exclusions,
       lastIndexedAt: snapshot.lastIndexedAt,
@@ -347,7 +398,8 @@ export class DashboardService {
       benchmarkCoefficients: snapshot.benchmarks,
       calibration: snapshot.calibration,
       exclusions: snapshot.exclusions,
-      sourceLinks: snapshot.sourceLinks
+      pricingCatalog: snapshot.pricingCatalog,
+      sourcesByTab: snapshot.sourcesByTab
     };
   }
 
@@ -439,7 +491,8 @@ export class DashboardService {
         coverageDetails: classified.coverageDetails,
         exclusions: classified.exclusions,
         pricingTable: PRICING_TABLE,
-        sourceLinks: getMethodologySourceLinks(),
+        pricingCatalog: PRICING_CATALOG_METADATA,
+        sourcesByTab: getMethodologySourcesByTab(rawEvents.map((event) => event.provider)),
         benchmarks: BENCHMARK_COEFFICIENTS,
         calibration: classified.calibration,
         lastIndexedAt,

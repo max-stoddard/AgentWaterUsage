@@ -127,7 +127,7 @@ describe("DashboardService", () => {
     cache.cleanup();
   });
 
-  it("groups coverage details by source and supports anthropic pricing aliases", () => {
+  it("groups coverage details by source and rolls dated Claude models into canonical model usage", () => {
     const codex = createCodexHome();
     const claude = createClaudeHome();
     const cache = createCacheDir();
@@ -200,8 +200,8 @@ describe("DashboardService", () => {
           tokens: 80
         }),
         expect.objectContaining({
-          provider: "claude",
-          model: "claude-sonnet-4-20250514",
+          provider: "anthropic",
+          model: "claude-sonnet-4",
           source: "CLI",
           classification: "supported",
           tokens: 60
@@ -213,6 +213,22 @@ describe("DashboardService", () => {
           classification: "excluded",
           tokens: 40,
           reason: "Unsupported provider: ollama"
+        })
+      ])
+    );
+    expect(overview.modelUsage).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          provider: "openai",
+          model: "gpt-5.3-codex",
+          totalTokens: 200,
+          supportedTokens: 200
+        }),
+        expect.objectContaining({
+          provider: "anthropic",
+          model: "claude-sonnet-4",
+          totalTokens: 60,
+          supportedTokens: 60
         })
       ])
     );
@@ -277,7 +293,7 @@ describe("DashboardService", () => {
       expect.arrayContaining([
         expect.objectContaining({
           provider: "anthropic",
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4",
           source: "Claude Code",
           classification: "supported",
           tokens: 110
@@ -289,6 +305,22 @@ describe("DashboardService", () => {
           classification: "excluded",
           tokens: 60,
           reason: "Unsupported model: unknown"
+        })
+      ])
+    );
+    expect(overview.modelUsage).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          provider: "anthropic",
+          model: "claude-sonnet-4",
+          totalTokens: 110,
+          supportedTokens: 110
+        }),
+        expect.objectContaining({
+          provider: "anthropic",
+          model: "unknown",
+          totalTokens: 60,
+          excludedTokens: 60
         })
       ])
     );

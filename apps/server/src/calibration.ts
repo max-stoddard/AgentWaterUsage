@@ -24,8 +24,8 @@ export function buildSignature({ codexHome, claudeHome, codexHomeState, fileFing
   return crypto
     .createHash("sha1")
     .update(
-      JSON.stringify({
-        pricingVersion: "2026-03-09",
+        JSON.stringify({
+        pricingVersion: "2026-03-13-portkey-catalog",
         codexHome,
         claudeHome,
         codexHomeState,

@@ -25,6 +25,16 @@ export interface CoverageSummary {
   excludedModels: number;
 }
 
+export interface ModelUsageEntry {
+  provider: string;
+  model: string;
+  totalTokens: number;
+  events: number;
+  supportedTokens: number;
+  excludedTokens: number;
+  unestimatedTokens: number;
+}
+
 export type CoverageClassification = "supported" | "excluded" | "token_only";
 
 export interface CoverageDetail {
@@ -66,6 +76,7 @@ export interface OverviewResponse {
   waterLitres: WaterRange;
   coverage: CoverageCounts;
   coverageSummary: CoverageSummary;
+  modelUsage: ModelUsageEntry[];
   coverageDetails: CoverageDetail[];
   exclusions: ExclusionSummary[];
   lastIndexedAt: number | null;
@@ -94,7 +105,24 @@ export interface PricingEntry {
   inputUsdPerMillion: number;
   cachedInputUsdPerMillion: number;
   outputUsdPerMillion: number;
-  docsUrl: string;
+  sourceUrl: string;
+  sourceLabel: string;
+}
+
+export type MethodologyTabId = "prompts" | "water" | "energy" | "carbon";
+
+export interface MethodologySourceLink {
+  label: string;
+  url: string;
+}
+
+export interface PricingCatalogMetadata {
+  generatedAt: string;
+  sourceRepoUrl: string;
+  sourceDirectoryUrl: string;
+  licenseUrl: string;
+  providerCount: number;
+  modelCount: number;
 }
 
 export interface MethodologyResponse {
@@ -102,7 +130,8 @@ export interface MethodologyResponse {
   benchmarkCoefficients: WaterRange;
   calibration: CalibrationSnapshot | null;
   exclusions: ExclusionSummary[];
-  sourceLinks: Array<{ label: string; url: string }>;
+  pricingCatalog: PricingCatalogMetadata;
+  sourcesByTab: Record<MethodologyTabId, MethodologySourceLink[]>;
 }
 
 export interface ErrorResponse {

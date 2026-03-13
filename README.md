@@ -78,7 +78,13 @@ For Claude Code usage, the backend reads assistant message usage rows from `~/.c
 
 ### 2. Tokens are converted into a cost-equivalent proxy
 
-The UI does not show USD, but the app uses official OpenAI model pricing as a stable weighting proxy for relative inference intensity [3-8].
+The UI does not show USD, but the app uses a bundled pricing snapshot generated from Portkey's MIT-licensed models catalog as a stable weighting proxy for relative inference intensity [3-8].
+
+The runtime stays offline-safe for `npx` users. Pricing data is refreshed by maintainers with:
+
+```bash
+npm run sync:pricing
+```
 
 For each supported event:
 
@@ -89,15 +95,7 @@ eventCostUsd =
   + outputTokens / 1,000,000 * outputPrice
 ```
 
-Supported pricing table used in this app:
-
-| Model | Input / 1M | Cached input / 1M | Output / 1M |
-| --- | ---: | ---: | ---: |
-| `gpt-5.1-codex-mini` | `$0.25` | `$0.025` | `$2.00` |
-| `gpt-5.1-codex-max` | `$1.25` | `$0.125` | `$10.00` |
-| `gpt-5.2-codex` | `$1.75` | `$0.175` | `$14.00` |
-| `gpt-5.3-codex` | `$1.75` | `$0.175` | `$14.00` |
-| `gpt-5.4` | `$2.50` | `$0.25` | `$15.00` |
+The app bundles the generated Portkey snapshot rather than maintaining a small handwritten table in the repo. The live UI exposes the current priced model catalog, and maintainers can refresh it with `npm run sync:pricing`.
 
 ### 3. The app calibrates against your own local usage history
 
@@ -173,6 +171,7 @@ The main uncertainty comes from three places:
 ## Quality checks
 
 ```bash
+npm run sync:pricing
 npm run lint
 npm run test
 npm run build

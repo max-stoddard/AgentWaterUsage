@@ -1,4 +1,5 @@
-import type { PricingEntry, WaterRange } from "@agentic-insights/shared";
+import type { MethodologySourceLink, MethodologyTabId, PricingCatalogMetadata, PricingEntry, WaterRange } from "@agentic-insights/shared";
+import { GENERATED_PRICING_CATALOG } from "./generated/pricing-catalog.js";
 
 export const BENCHMARK_COEFFICIENTS: WaterRange = {
   low: 0.010585,
@@ -6,150 +7,206 @@ export const BENCHMARK_COEFFICIENTS: WaterRange = {
   high: 0.029926
 };
 
-const OPENAI_PRICING_URL = "https://openai.com/api/pricing/";
-const OPENAI_MODELS_URL = "https://platform.openai.com/docs/models";
-const ANTHROPIC_PRICING_URL = "https://docs.anthropic.com/en/docs/about-claude/pricing";
-const ANTHROPIC_MODELS_URL = "https://docs.anthropic.com/en/docs/about-claude/models/all-models";
+const WATER_PAPER_SOURCES: MethodologySourceLink[] = [
+  {
+    label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)",
+    url: "https://doi.org/10.1145/3724499"
+  },
+  {
+    label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
+    url: "https://arxiv.org/abs/2304.03271"
+  }
+];
 
-function entry(
-  provider: string,
-  model: string,
-  inputUsdPerMillion: number,
-  cachedInputUsdPerMillion: number,
-  outputUsdPerMillion: number,
-  docsUrl: string
-): PricingEntry {
-  return {
-    provider,
-    model,
-    inputUsdPerMillion,
-    cachedInputUsdPerMillion,
-    outputUsdPerMillion,
-    docsUrl
-  };
+const ENERGY_SOURCES: MethodologySourceLink[] = [
+  {
+    label: "CodeCarbon methodology",
+    url: "https://mlco2.github.io/codecarbon/methodology.html"
+  }
+];
+
+const CARBON_SOURCES: MethodologySourceLink[] = [
+  {
+    label: "GHG Protocol Corporate Standard",
+    url: "https://ghgprotocol.org/corporate-standard"
+  },
+  {
+    label: "GHG Protocol Scope 2 Guidance",
+    url: "https://ghgprotocol.org/scope-2-guidance"
+  },
+  ...ENERGY_SOURCES
+];
+
+const LOCAL_MODEL_ALIASES = new Map<string, string>([
+  ["gpt-5.1-codex-max-old", "gpt-5.1-codex-max"],
+  ["claude-sonnet-4-20250514", "claude-sonnet-4"],
+  ["claude-sonnet-4-0", "claude-sonnet-4"],
+  ["claude-sonnet-4.6", "claude-sonnet-4-6"],
+  ["claude-sonnet-4-6-latest", "claude-sonnet-4-6"],
+  ["claude-sonnet-3.7", "claude-3-7-sonnet-latest"],
+  ["claude-sonnet-3.5", "claude-3-5-sonnet-latest"],
+  ["claude-opus-4-20250514", "claude-opus-4"],
+  ["claude-opus-4-0", "claude-opus-4"],
+  ["claude-4-opus-20250514", "claude-opus-4"],
+  ["claude-opus-4-1-20250805", "claude-opus-4-1"],
+  ["claude-opus-3", "claude-3-opus-latest"],
+  ["claude-haiku-4.5", "claude-haiku-4-5"],
+  ["claude-haiku-4-5-latest", "claude-haiku-4-5"],
+  ["claude-haiku-3.5", "claude-3-5-haiku-latest"],
+  ["claude-haiku-3", "claude-3-haiku-20240307"]
+]);
+
+const PREFERRED_SOURCE_MODELS = new Map<string, string>([
+  ["claude-opus-4", "claude-opus-4-20250514"],
+  ["claude-opus-4-1", "claude-opus-4-1-20250805"],
+  ["claude-sonnet-4", "claude-sonnet-4-20250514"],
+  ["claude-haiku-4-5", "claude-haiku-4-5-20251001"]
+]);
+
+export const PRICING_CATALOG_METADATA: PricingCatalogMetadata = GENERATED_PRICING_CATALOG.metadata;
+
+function dedupeSourceLinks(...links: MethodologySourceLink[]): MethodologySourceLink[] {
+  const unique = new Map<string, MethodologySourceLink>();
+  for (const link of links) {
+    unique.set(link.url, link);
+  }
+  return [...unique.values()];
 }
 
-function normalizeProvider(provider: string): string {
+export function normalizeProvider(provider: string): string {
   const normalized = provider.trim().toLowerCase();
   return normalized === "claude" ? "anthropic" : normalized;
 }
 
-function buildPricingRegistry() {
-  const canonicalEntries: PricingEntry[] = [
-    entry("openai", "gpt-5.4", 2.5, 0.25, 15, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5.2", 1.75, 0.175, 14, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5.1", 1.25, 0.125, 10, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5", 1.25, 0.125, 10, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5-mini", 0.25, 0.025, 2, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5-nano", 0.05, 0.005, 0.4, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5.2-chat-latest", 1.75, 0.175, 14, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5.1-chat-latest", 1.25, 0.125, 10, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5-chat-latest", 1.25, 0.125, 10, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5.2-codex", 1.75, 0.175, 14, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5.1-codex", 1.25, 0.125, 10, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5.1-codex-max", 1.25, 0.125, 10, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5-codex", 1.25, 0.125, 10, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5.2-pro", 21, 0, 168, OPENAI_PRICING_URL),
-    entry("openai", "gpt-5-pro", 15, 0, 120, OPENAI_PRICING_URL),
-    entry("openai", "gpt-4.1", 2, 0.5, 8, OPENAI_PRICING_URL),
-    entry("openai", "gpt-4.1-mini", 0.4, 0.1, 1.6, OPENAI_PRICING_URL),
-    entry("openai", "gpt-4.1-nano", 0.1, 0.025, 0.4, OPENAI_PRICING_URL),
-    entry("openai", "gpt-4o", 2.5, 1.25, 10, OPENAI_PRICING_URL),
-    entry("openai", "gpt-4o-2024-05-13", 5, 0, 15, OPENAI_PRICING_URL),
-    entry("openai", "gpt-4o-mini", 0.15, 0.075, 0.6, OPENAI_PRICING_URL),
-    entry("anthropic", "claude-opus-4-1", 15, 1.5, 75, ANTHROPIC_PRICING_URL),
-    entry("anthropic", "claude-opus-4", 15, 1.5, 75, ANTHROPIC_PRICING_URL),
-    entry("anthropic", "claude-sonnet-4-6", 3, 0.3, 15, ANTHROPIC_MODELS_URL),
-    entry("anthropic", "claude-sonnet-4", 3, 0.3, 15, ANTHROPIC_PRICING_URL),
-    entry("anthropic", "claude-3-7-sonnet-latest", 3, 0.3, 15, ANTHROPIC_PRICING_URL),
-    entry("anthropic", "claude-3-5-sonnet-latest", 3, 0.3, 15, ANTHROPIC_PRICING_URL),
-    entry("anthropic", "claude-haiku-4-5", 1, 0.1, 5, ANTHROPIC_MODELS_URL),
-    entry("anthropic", "claude-3-5-haiku-latest", 0.8, 0.08, 4, ANTHROPIC_PRICING_URL),
-    entry("anthropic", "claude-3-haiku-20240307", 0.25, 0.03, 1.25, ANTHROPIC_PRICING_URL),
-    entry("anthropic", "claude-3-opus-20240229", 15, 1.5, 75, ANTHROPIC_PRICING_URL)
-  ];
-
-  const aliases = new Map<string, PricingEntry>();
-  const register = (pricing: PricingEntry, aliasModels: string[] = [], aliasProviders: string[] = []) => {
-    const providers = [pricing.provider, ...aliasProviders].map((provider) => normalizeProvider(provider));
-    const models = [pricing.model, ...aliasModels].map((model) => model.trim().toLowerCase());
-    for (const provider of providers) {
-      for (const model of models) {
-        aliases.set(`${provider}:${model}`, pricing);
-      }
-    }
-  };
-
-  for (const pricing of canonicalEntries) {
-    register(pricing);
+function stripClaudeDateSuffix(model: string): string {
+  if (!model.startsWith("claude-")) {
+    return model;
   }
 
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "openai" && pricing.model === "gpt-5-mini")!,
-    ["gpt-5.1-codex-mini"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "openai" && pricing.model === "gpt-5.2-codex")!,
-    ["gpt-5.3-codex"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "openai" && pricing.model === "gpt-5.1-codex")!,
-    ["gpt-5.1-codex-max-old"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-opus-4-1")!,
-    ["claude-opus-4-1-20250805"],
-    ["claude"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-opus-4")!,
-    ["claude-opus-4-20250514"],
-    ["claude"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-sonnet-4-6")!,
-    ["claude-sonnet-4.6", "claude-sonnet-4-6-latest"],
-    ["claude"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-sonnet-4")!,
-    ["claude-sonnet-4-20250514"],
-    ["claude"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-3-7-sonnet-latest")!,
-    ["claude-3-7-sonnet-20250219", "claude-sonnet-3.7"],
-    ["claude"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-3-5-sonnet-latest")!,
-    ["claude-3-5-sonnet-20241022", "claude-sonnet-3.5"],
-    ["claude"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-haiku-4-5")!,
-    ["claude-haiku-4.5", "claude-haiku-4-5-latest"],
-    ["claude"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-3-5-haiku-latest")!,
-    ["claude-3-5-haiku-20241022", "claude-haiku-3.5"],
-    ["claude"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-3-haiku-20240307")!,
-    ["claude-3-haiku-latest", "claude-haiku-3"],
-    ["claude"]
-  );
-  register(
-    canonicalEntries.find((pricing) => pricing.provider === "anthropic" && pricing.model === "claude-3-opus-20240229")!,
-    ["claude-3-opus-latest", "claude-opus-3"],
-    ["claude"]
-  );
+  return model.replace(/-\d{8}$/, "");
+}
+
+export function normalizeModel(provider: string, model: string): string {
+  const normalizedProvider = normalizeProvider(provider);
+  const normalizedModel = model.trim().toLowerCase();
+  const directAlias = LOCAL_MODEL_ALIASES.get(normalizedModel);
+  if (directAlias) {
+    return directAlias;
+  }
+
+  if (normalizedProvider !== "anthropic") {
+    return normalizedModel;
+  }
+
+  const strippedClaudeModel = stripClaudeDateSuffix(normalizedModel);
+  return LOCAL_MODEL_ALIASES.get(strippedClaudeModel) ?? strippedClaudeModel;
+}
+
+export function canonicalizePricingIdentity(provider: string, model: string): { provider: string; model: string } {
+  const normalizedProvider = normalizeProvider(provider);
+  return {
+    provider: normalizedProvider,
+    model: normalizeModel(normalizedProvider, model)
+  };
+}
+
+function getLookupAliases(provider: string, canonicalModel: string): string[] {
+  const aliases = new Set<string>([canonicalModel]);
+
+  for (const [aliasModel, targetModel] of LOCAL_MODEL_ALIASES.entries()) {
+    if (targetModel === canonicalModel) {
+      aliases.add(aliasModel);
+    }
+  }
+
+  if (provider === "anthropic" && canonicalModel.startsWith("claude-")) {
+    aliases.add(`${canonicalModel}-latest`);
+  }
+
+  return [...aliases];
+}
+
+function selectPreferredRawEntry(canonicalModel: string, entries: PricingEntry[]): PricingEntry {
+  const preferredSourceModel = PREFERRED_SOURCE_MODELS.get(canonicalModel);
+
+  return [...entries].sort((left, right) => {
+    const leftModel = left.model.toLowerCase();
+    const rightModel = right.model.toLowerCase();
+    const leftScore =
+      Number(leftModel === canonicalModel) * 4 +
+      Number(preferredSourceModel !== undefined && leftModel === preferredSourceModel) * 3 +
+      Number(leftModel.endsWith("-latest")) * -1;
+    const rightScore =
+      Number(rightModel === canonicalModel) * 4 +
+      Number(preferredSourceModel !== undefined && rightModel === preferredSourceModel) * 3 +
+      Number(rightModel.endsWith("-latest")) * -1;
+
+    if (rightScore !== leftScore) {
+      return rightScore - leftScore;
+    }
+
+    return leftModel.localeCompare(rightModel);
+  })[0]!;
+}
+
+function buildPricingRegistry() {
+  const groupedEntries = new Map<string, PricingEntry[]>();
+  const providerSources = new Map<string, MethodologySourceLink>();
+
+  for (const providerSource of GENERATED_PRICING_CATALOG.providerSources) {
+    providerSources.set(normalizeProvider(providerSource.provider), {
+      label: providerSource.sourceLabel,
+      url: providerSource.sourceUrl
+    });
+  }
+
+  for (const rawEntry of GENERATED_PRICING_CATALOG.entries) {
+    const { provider, model } = canonicalizePricingIdentity(rawEntry.provider, rawEntry.model);
+    const key = `${provider}:${model}`;
+    const entries = groupedEntries.get(key) ?? [];
+    entries.push(rawEntry);
+    groupedEntries.set(key, entries);
+  }
+
+  const aliases = new Map<string, PricingEntry>();
+  const canonicalEntries: PricingEntry[] = [];
+
+  for (const [key, rawEntries] of groupedEntries.entries()) {
+    const separator = key.indexOf(":");
+    const provider = key.slice(0, separator);
+    const model = key.slice(separator + 1);
+    const preferredRawEntry = selectPreferredRawEntry(model, rawEntries);
+    const canonicalEntry: PricingEntry = {
+      ...preferredRawEntry,
+      provider,
+      model,
+      sourceUrl: preferredRawEntry.sourceUrl,
+      sourceLabel: preferredRawEntry.sourceLabel
+    };
+
+    canonicalEntries.push(canonicalEntry);
+
+    for (const rawEntry of rawEntries) {
+      aliases.set(`${normalizeProvider(rawEntry.provider)}:${rawEntry.model.trim().toLowerCase()}`, canonicalEntry);
+    }
+
+    for (const aliasModel of getLookupAliases(provider, model)) {
+      aliases.set(`${provider}:${aliasModel}`, canonicalEntry);
+    }
+  }
+
+  canonicalEntries.sort((left, right) => {
+    if (left.provider !== right.provider) {
+      return left.provider.localeCompare(right.provider);
+    }
+
+    return left.model.localeCompare(right.model);
+  });
 
   return {
     canonicalEntries,
-    aliases
+    aliases,
+    providerSources
   };
 }
 
@@ -158,9 +215,9 @@ const registry = buildPricingRegistry();
 export const PRICING_TABLE: PricingEntry[] = registry.canonicalEntries;
 
 export function getPricingEntry(provider: string, model: string): PricingEntry | null {
-  const normalizedProvider = normalizeProvider(provider);
+  const { provider: normalizedProvider } = canonicalizePricingIdentity(provider, model);
   const normalizedModel = model.trim().toLowerCase();
-  return registry.aliases.get(`${normalizedProvider}:${normalizedModel}`) ?? null;
+  return registry.aliases.get(`${normalizedProvider}:${normalizedModel}`) ?? registry.aliases.get(`${normalizedProvider}:${normalizeModel(normalizedProvider, model)}`) ?? null;
 }
 
 export function calculateEventCostUsd(
@@ -176,19 +233,34 @@ export function calculateEventCostUsd(
   );
 }
 
-export function getMethodologySourceLinks(): Array<{ label: string; url: string }> {
-  return [
+export function getMethodologySourcesByTab(providers: Iterable<string>): Record<MethodologyTabId, MethodologySourceLink[]> {
+  const providerSources = [...new Set([...providers].map((provider) => normalizeProvider(provider)))]
+    .flatMap((provider) => {
+      const source = registry.providerSources.get(provider);
+      return source ? [source] : [];
+    })
+    .sort((left, right) => left.label.localeCompare(right.label));
+
+  const catalogSources = dedupeSourceLinks(
     {
-      label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)",
-      url: "https://doi.org/10.1145/3724499"
+      label: "Portkey models repo (MIT)",
+      url: PRICING_CATALOG_METADATA.sourceRepoUrl
     },
     {
-      label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
-      url: "https://arxiv.org/abs/2304.03271"
+      label: "Portkey pricing directory",
+      url: PRICING_CATALOG_METADATA.sourceDirectoryUrl
     },
-    { label: "OpenAI API pricing", url: OPENAI_PRICING_URL },
-    { label: "OpenAI model docs", url: OPENAI_MODELS_URL },
-    { label: "Anthropic API pricing", url: ANTHROPIC_PRICING_URL },
-    { label: "Anthropic model docs", url: ANTHROPIC_MODELS_URL }
-  ];
+    {
+      label: "Portkey MIT license",
+      url: PRICING_CATALOG_METADATA.licenseUrl
+    },
+    ...providerSources
+  );
+
+  return {
+    prompts: catalogSources,
+    water: dedupeSourceLinks(...WATER_PAPER_SOURCES, ...catalogSources),
+    energy: dedupeSourceLinks(...ENERGY_SOURCES, ...catalogSources),
+    carbon: dedupeSourceLinks(...CARBON_SOURCES, ...catalogSources)
+  };
 }
