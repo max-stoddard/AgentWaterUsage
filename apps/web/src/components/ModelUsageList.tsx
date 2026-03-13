@@ -6,33 +6,19 @@ interface ModelUsageListProps {
 }
 
 function getAccentClass(item: ModelUsageEntry): string {
-  if (item.supportedTokens > 0) {
+  if (item.status === "allowed") {
     return "bg-emerald-500";
   }
 
-  if (item.excludedTokens > 0) {
-    return "bg-accent";
+  if (item.status === "local") {
+    return "bg-amber-400";
   }
 
-  return "bg-ink-tertiary";
+  return "bg-accent";
 }
 
 function formatBreakdown(item: ModelUsageEntry): string {
-  const parts = [`${formatNumber(item.totalTokens)} tokens`];
-
-  if (item.supportedTokens > 0) {
-    parts.push(`${formatNumber(item.supportedTokens)} estimated`);
-  }
-
-  if (item.excludedTokens > 0) {
-    parts.push(`${formatNumber(item.excludedTokens)} excluded`);
-  }
-
-  if (item.unestimatedTokens > 0) {
-    parts.push(`${formatNumber(item.unestimatedTokens)} token-only`);
-  }
-
-  return parts.join(" · ");
+  return item.statusNote ? `${formatNumber(item.totalTokens)} tokens · ${item.statusNote}` : `${formatNumber(item.totalTokens)} tokens`;
 }
 
 export function ModelUsageList({ items }: ModelUsageListProps) {

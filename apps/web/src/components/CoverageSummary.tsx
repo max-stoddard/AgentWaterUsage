@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { OverviewResponse } from "@agentic-insights/shared";
 import { ModelUsageList } from "./ModelUsageList";
+import { ModelUsageStatusKey } from "./ModelUsageStatusKey";
 import { UsageSummaryMetrics } from "./UsageSummaryMetrics";
 
 interface CoverageSummaryProps {
@@ -38,6 +39,7 @@ export function CoverageSummary({ overview, onOpenMethodology }: CoverageSummary
         prompts={overview.coverageSummary.prompts}
         tokens={overview.tokenTotals.supportedTokens}
       />
+      <ModelUsageStatusKey />
 
       {hasModelUsage ? (
         <div className="mt-5">

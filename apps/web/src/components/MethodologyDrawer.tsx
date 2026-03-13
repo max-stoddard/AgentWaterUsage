@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MethodologyResponse, MethodologyTabId, OverviewResponse } from "@agentic-insights/shared";
 import { formatLitres, formatNumber } from "../lib/format";
 import { ModelUsageList } from "./ModelUsageList";
+import { ModelUsageStatusKey } from "./ModelUsageStatusKey";
 import { SkeletonBlock } from "./SkeletonBlock";
 import { UsageSummaryMetrics } from "./UsageSummaryMetrics";
 
@@ -217,6 +218,7 @@ export function MethodologyDrawer({ open, methodology, overview, loading, onClos
                     tokens={overview?.tokenTotals.supportedTokens ?? 0}
                     compact={false}
                   />
+                  <ModelUsageStatusKey />
 
                   <section>
                     <h3 className="text-sm font-semibold text-ink">What counts</h3>

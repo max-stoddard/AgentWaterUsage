@@ -39,7 +39,9 @@ function mockDashboardResponses() {
               events: 10,
               supportedTokens: 900,
               excludedTokens: 0,
-              unestimatedTokens: 50
+              unestimatedTokens: 50,
+              status: "allowed",
+              statusNote: "includes fallback-only usage"
             },
             {
               provider: "anthropic",
@@ -48,25 +50,31 @@ function mockDashboardResponses() {
               events: 3,
               supportedTokens: 120,
               excludedTokens: 0,
-              unestimatedTokens: 0
+              unestimatedTokens: 0,
+              status: "allowed",
+              statusNote: null
             },
             {
-              provider: "ollama",
+              provider: "anthropic",
               model: "qwen3.5:9b",
               totalTokens: 50,
               events: 1,
               supportedTokens: 0,
               excludedTokens: 50,
-              unestimatedTokens: 0
+              unestimatedTokens: 0,
+              status: "unknown",
+              statusNote: "pricing not available yet"
             },
             {
-              provider: "openai",
-              model: "gpt-4o-mini",
-              totalTokens: 20,
+              provider: "ollama",
+              model: "qwen2.5-coder:7b",
+              totalTokens: 40,
               events: 1,
-              supportedTokens: 20,
-              excludedTokens: 0,
-              unestimatedTokens: 0
+              supportedTokens: 0,
+              excludedTokens: 40,
+              unestimatedTokens: 0,
+              status: "local",
+              statusNote: "local usage"
             }
           ],
           coverageDetails: [
@@ -89,13 +97,22 @@ function mockDashboardResponses() {
               reason: null
             },
             {
-              provider: "ollama",
+              provider: "anthropic",
               model: "qwen3.5:9b",
               source: "CLI",
               tokens: 50,
               events: 1,
               classification: "excluded",
-              reason: "Unsupported provider: ollama"
+              reason: "Unknown model: qwen3.5:9b"
+            },
+            {
+              provider: "ollama",
+              model: "qwen2.5-coder:7b",
+              source: "CLI",
+              tokens: 40,
+              events: 1,
+              classification: "excluded",
+              reason: "Local usage: qwen2.5-coder:7b"
             },
             {
               provider: "openai",
@@ -114,12 +131,20 @@ function mockDashboardResponses() {
           },
           exclusions: [
             {
-              provider: "ollama",
+              provider: "anthropic",
               model: "qwen3.5:9b",
               source: "CLI",
               tokens: 50,
               events: 1,
-              reason: "Unsupported provider: ollama"
+              reason: "Unknown model: qwen3.5:9b"
+            },
+            {
+              provider: "ollama",
+              model: "qwen2.5-coder:7b",
+              source: "CLI",
+              tokens: 40,
+              events: 1,
+              reason: "Local usage: qwen2.5-coder:7b"
             }
           ],
           lastIndexedAt: Date.parse("2026-03-09T12:00:00.000Z"),
@@ -338,6 +363,9 @@ describe("App", () => {
     expect(screen.getByText("sessions")).toBeInTheDocument();
     expect(screen.getByText("prompts")).toBeInTheDocument();
     expect(breakdownSection).toHaveTextContent("tokens");
+    expect(screen.getByText("Included in estimate")).toBeInTheDocument();
+    expect(screen.getByText("Local usage")).toBeInTheDocument();
+    expect(screen.getByText("Pricing not available")).toBeInTheDocument();
 
     expect(screen.getByText(/Prompt insights/i)).toBeInTheDocument();
     expect(screen.getByText(/Energy estimates/i)).toBeInTheDocument();
@@ -424,6 +452,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Energy" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Carbon" })).toBeInTheDocument();
     expect(screen.getByText(/Sessions are distinct Codex and Claude Code runs/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Included in estimate").length).toBeGreaterThan(0);
     expect(screen.getByText(/Bundled pricing snapshot/i)).toBeInTheDocument();
     expect(screen.getByText(/eventCostUsd = input\/1e6/i)).toBeInTheDocument();
     expect(await screen.findByText(/gpt-5.2-codex/i)).toBeInTheDocument();
@@ -471,9 +500,10 @@ describe("App", () => {
 
     expect(screen.getAllByText("openai / gpt-5.4")).toHaveLength(1);
     expect(screen.getByText("anthropic / claude-sonnet-4")).toBeInTheDocument();
-    expect(screen.getByText("950 tokens · 900 estimated · 50 token-only")).toBeInTheDocument();
-    expect(screen.getByText("50 tokens · 50 excluded")).toBeInTheDocument();
-    expect(screen.getByText("openai / gpt-4o-mini")).toBeInTheDocument();
+    expect(screen.getByText("950 tokens · includes fallback-only usage")).toBeInTheDocument();
+    expect(screen.getByText("50 tokens · pricing not available yet")).toBeInTheDocument();
+    expect(screen.getByText("ollama / qwen2.5-coder:7b")).toBeInTheDocument();
+    expect(screen.getByText("40 tokens · local usage")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Show fewer models/i })).toBeInTheDocument();
   });
 
