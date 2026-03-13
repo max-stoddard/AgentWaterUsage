@@ -58,4 +58,28 @@
   .pill {
     @apply inline-flex items-center rounded-md bg-surface-muted px-2.5 py-1 text-xs font-medium text-ink-secondary;
   }
+
+  .hero-word {
+    display: inline-block;
+    animation: hero-word-rise 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform, opacity;
+  }
+}
+
+@keyframes hero-word-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0.32em) scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-word {
+    animation: none;
+  }
 }
