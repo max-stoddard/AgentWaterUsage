@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import type { TimeseriesPoint } from "@agentic-insights/shared";
 import { Bar, BarChart, CartesianGrid, Cell, Rectangle, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -29,6 +29,7 @@ interface ChartBarShapeProps extends ComponentProps<typeof Rectangle> {
 }
 
 const MAX_VISIBLE_LABELS = 5;
+const MIN_CHART_HEIGHT = 280;
 
 function toChartData(points: TimeseriesPoint[]): ChartDatum[] {
   return points.map((point) => ({
@@ -96,6 +97,49 @@ function ChartBarShape({ payload, ...shapeProps }: ChartBarShapeProps) {
 export function WaterChart({ points }: WaterChartProps) {
   const chartData = useMemo(() => toChartData(points), [points]);
   const xAxisInterval = useMemo(() => getXAxisInterval(chartData.length), [chartData.length]);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [chartSize, setChartSize] = useState({ width: 0, height: MIN_CHART_HEIGHT });
+
+  useEffect(() => {
+    const element = chartRef.current;
+    if (!element) {
+      return;
+    }
+
+    const updateSize = () => {
+      const nextWidth = Math.max(element.clientWidth, 0);
+      const nextHeight = Math.max(element.clientHeight, MIN_CHART_HEIGHT);
+      setChartSize((current) => {
+        if (current.width === nextWidth && current.height === nextHeight) {
+          return current;
+        }
+
+        return {
+          width: nextWidth,
+          height: nextHeight
+        };
+      });
+    };
+
+    updateSize();
+
+    if (typeof window.ResizeObserver === "function") {
+      const observer = new window.ResizeObserver(() => {
+        updateSize();
+      });
+      observer.observe(element);
+
+      return () => {
+        observer.disconnect();
+      };
+    }
+
+    window.addEventListener("resize", updateSize);
+
+    return () => {
+      window.removeEventListener("resize", updateSize);
+    };
+  }, []);
 
   if (chartData.length === 0) {
     return (
@@ -108,63 +152,66 @@ export function WaterChart({ points }: WaterChartProps) {
   return (
     <div className="mt-6">
       <div
+        ref={chartRef}
         data-testid="water-chart"
         className="min-w-0 h-72 overflow-hidden rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.95),rgba(248,250,252,0.88))] px-3 pb-2 pt-4 sm:h-80 sm:px-4"
       >
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
-          <BarChart
-            data={chartData}
-            margin={{ top: 8, right: 8, bottom: 12, left: 0 }}
-            barCategoryGap={chartData.length > 12 ? "24%" : "32%"}
-          >
-            <defs>
-              <linearGradient id="water-bar-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0EA5E9" />
-                <stop offset="100%" stopColor="#38BDF8" />
-              </linearGradient>
-            </defs>
-
-            <CartesianGrid vertical={false} stroke="#DDEAF5" strokeDasharray="3 6" />
-
-            <XAxis
-              dataKey="label"
-              axisLine={false}
-              tickLine={false}
-              interval={xAxisInterval}
-              minTickGap={24}
-              tick={{ fill: "#64748B", fontSize: 12, fontWeight: 500 }}
-              dy={10}
-            />
-
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              width={52}
-              tick={{ fill: "#94A3B8", fontSize: 11 }}
-              tickFormatter={formatAxisLitres}
-            />
-
-            <Tooltip
-              cursor={{ fill: "rgba(14, 165, 233, 0.08)" }}
-              content={<ChartTooltipContent />}
-              wrapperStyle={{ outline: "none" }}
-            />
-
-            <Bar
-              dataKey="central"
-              radius={[12, 12, 4, 4]}
-              fill="url(#water-bar-fill)"
-              activeBar={{ fill: "#0284C7", stroke: "#E0F2FE", strokeWidth: 1.25 }}
-              background={{ fill: "rgba(186, 230, 253, 0.28)" }}
-              minPointSize={chartData.length > 1 ? 3 : 6}
-              shape={<ChartBarShape />}
+        {chartSize.width > 0 ? (
+          <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
+            <BarChart
+              data={chartData}
+              margin={{ top: 8, right: 8, bottom: 12, left: 0 }}
+              barCategoryGap={chartData.length > 12 ? "24%" : "32%"}
             >
-              {chartData.map((point) => (
-                <Cell key={point.key} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+              <defs>
+                <linearGradient id="water-bar-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0EA5E9" />
+                  <stop offset="100%" stopColor="#38BDF8" />
+                </linearGradient>
+              </defs>
+
+              <CartesianGrid vertical={false} stroke="#DDEAF5" strokeDasharray="3 6" />
+
+              <XAxis
+                dataKey="label"
+                axisLine={false}
+                tickLine={false}
+                interval={xAxisInterval}
+                minTickGap={24}
+                tick={{ fill: "#64748B", fontSize: 12, fontWeight: 500 }}
+                dy={10}
+              />
+
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                width={52}
+                tick={{ fill: "#94A3B8", fontSize: 11 }}
+                tickFormatter={formatAxisLitres}
+              />
+
+              <Tooltip
+                cursor={{ fill: "rgba(14, 165, 233, 0.08)" }}
+                content={<ChartTooltipContent />}
+                wrapperStyle={{ outline: "none" }}
+              />
+
+              <Bar
+                dataKey="central"
+                radius={[12, 12, 4, 4]}
+                fill="url(#water-bar-fill)"
+                activeBar={{ fill: "#0284C7", stroke: "#E0F2FE", strokeWidth: 1.25 }}
+                background={{ fill: "rgba(186, 230, 253, 0.28)" }}
+                minPointSize={chartData.length > 1 ? 3 : 6}
+                shape={<ChartBarShape />}
+              >
+                {chartData.map((point) => (
+                  <Cell key={point.key} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        ) : null}
       </div>
     </div>
   );
