@@ -18,7 +18,7 @@ describe("release metadata", () => {
     const webPackage = readJson("apps/web/package.json");
     const sharedPackage = readJson("packages/shared/package.json");
 
-    expect(rootPackage.version).toBe("0.1.0");
+    expect(rootPackage.version).toBe("0.1.1");
     expect(cliPackage.version).toBe(rootPackage.version);
     expect(serverPackage.version).toBe(rootPackage.version);
     expect(webPackage.version).toBe(rootPackage.version);
@@ -32,7 +32,7 @@ describe("release metadata", () => {
     const releaseNotesPath = path.join(repoRoot, ".github", "release-notes", `v${cliPackage.version}.md`);
 
     expect(fs.existsSync(releaseNotesPath)).toBe(true);
-    expect(fs.readFileSync(releaseNotesPath, "utf8")).toContain("Canonical npm launcher is now `agentic-insights`");
+    expect(fs.readFileSync(releaseNotesPath, "utf8")).toContain("fixes the published CLI manifest");
   });
 
   it("publishes the CLI under the expected npm package and GitHub repository", () => {
@@ -47,7 +47,7 @@ describe("release metadata", () => {
 
     expect(cliPackage.name).toBe("agentic-insights");
     expect(cliPackage.bin).toEqual({
-      "agentic-insights": "./dist/index.js"
+      "agentic-insights": "dist/index.js"
     });
     expect(cliPackage.repository).toEqual({
       type: "git",
@@ -76,7 +76,7 @@ describe("release metadata", () => {
     );
 
     expect(mirrorScript).toContain('name: "@max-stoddard/agentic-insights"');
-    expect(mirrorScript).toContain('"agentic-insights": "./dist/index.js"');
+    expect(mirrorScript).toContain('"agentic-insights": "dist/index.js"');
     expect(mirrorScript).toContain("https://npm.pkg.github.com");
   });
 });

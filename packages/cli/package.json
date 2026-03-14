@@ -1,6 +1,6 @@
 {
   "name": "agentic-insights",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Launch a local dashboard for coding-agent insights with water-impact estimates",
   "license": "MIT",
   "type": "module",
@@ -14,7 +14,7 @@
     "url": "https://github.com/max-stoddard/agentic-insights/issues"
   },
   "bin": {
-    "agentic-insights": "./dist/index.js"
+    "agentic-insights": "dist/index.js"
   },
   "files": [
     "dist"

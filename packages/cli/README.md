@@ -5,7 +5,7 @@
 ## Run
 
 ```bash
-npx agentic-insights@0.1.0
+npx agentic-insights@0.1.1
 ```
 
 That command starts a local server, opens the dashboard in your browser, and reads usage data from your machine.

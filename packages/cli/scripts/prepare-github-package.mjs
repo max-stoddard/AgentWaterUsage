@@ -65,7 +65,7 @@ fs.writeFileSync(
         url: "https://github.com/max-stoddard/agentic-insights/issues"
       },
       bin: {
-        "agentic-insights": "./dist/index.js"
+        "agentic-insights": "dist/index.js"
       },
       files: ["dist"],
       engines: cliPackage.engines,
