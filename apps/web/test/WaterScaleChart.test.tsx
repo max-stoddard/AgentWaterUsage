@@ -26,6 +26,19 @@ describe("WaterScaleChart", () => {
     expect(tooltip).toHaveTextContent("Uses NIST's 1 cup = 240 mL conversion.");
   });
 
+  it("hides the tooltip when the pointer leaves a comparison point", () => {
+    render(<WaterScaleChart waterLitres={waterLitres} />);
+
+    const point = screen.getByTestId("water-scale-hit-cup-of-water");
+    fireEvent.mouseEnter(point);
+
+    expect(screen.getByTestId("water-scale-tooltip")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(point);
+
+    expect(screen.queryByTestId("water-scale-tooltip")).not.toBeInTheDocument();
+  });
+
   it("shows the AI range tooltip when the AI marker is focused", () => {
     render(<WaterScaleChart waterLitres={waterLitres} />);
 
@@ -35,6 +48,20 @@ describe("WaterScaleChart", () => {
     expect(tooltip).toHaveTextContent("Your AI usage");
     expect(tooltip).toHaveTextContent("1.20 L");
     expect(tooltip).toHaveTextContent("Between 500.0 mL and 2.10 L");
+    expect(screen.queryByTestId("water-scale-range")).not.toBeInTheDocument();
+  });
+
+  it("positions the AI marker label above-left of the dot", () => {
+    render(<WaterScaleChart waterLitres={waterLitres} />);
+
+    const markerGroup = screen.getByTestId("water-scale-ai-marker");
+    const markerDot = markerGroup.querySelector('circle[r="7"]');
+    const markerLabel = screen.getByTestId("water-scale-ai-label");
+
+    expect(markerDot).not.toBeNull();
+    expect(markerLabel).toHaveAttribute("text-anchor", "end");
+    expect(Number(markerLabel.getAttribute("x"))).toBeLessThan(Number(markerDot?.getAttribute("cx")));
+    expect(Number(markerLabel.getAttribute("y"))).toBeLessThan(Number(markerDot?.getAttribute("cy")));
   });
 
   it("supports keyboard focus for fixed comparison points", () => {
@@ -46,5 +73,27 @@ describe("WaterScaleChart", () => {
     expect(tooltip).toHaveTextContent("A car");
     expect(tooltip).toHaveTextContent("67,500 L");
     expect(tooltip).toHaveTextContent(/more than 95% occurs in the production phase/i);
+  });
+
+  it("keeps the rightmost comparison label centered on its anchor", () => {
+    render(<WaterScaleChart waterLitres={waterLitres} />);
+
+    const rightmostAnchor = screen.getByTestId("water-scale-anchor-golf-course-daily");
+    const label = rightmostAnchor.querySelector("text");
+    const markerDot = rightmostAnchor.querySelector('circle[r="6"]');
+
+    expect(label).not.toBeNull();
+    expect(markerDot).not.toBeNull();
+    expect(label).toHaveAttribute("text-anchor", "middle");
+    expect(Number(label?.getAttribute("x"))).toBe(Number(markerDot?.getAttribute("cx")));
+  });
+
+  it("renders a mobile legend and no horizontal-scroll layout classes", () => {
+    render(<WaterScaleChart waterLitres={waterLitres} />);
+
+    expect(screen.getByTestId("water-scale-mobile-legend")).toHaveTextContent("A cup of water");
+    expect(screen.getByTestId("water-scale-mobile-legend")).toHaveTextContent("67.5 KL");
+    expect(screen.getByTestId("water-scale-scroll")).not.toHaveClass("overflow-x-auto");
+    expect(screen.getByTestId("water-scale-canvas")).not.toHaveClass("min-w-[56rem]");
   });
 });

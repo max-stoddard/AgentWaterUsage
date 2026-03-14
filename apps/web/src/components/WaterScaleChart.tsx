@@ -40,7 +40,7 @@ const SVG_WIDTH = 960;
 const SVG_HEIGHT = 380;
 const CHART_PADDING = {
   top: 28,
-  right: 36,
+  right: 72,
   bottom: 122,
   left: 88
 } as const;
@@ -147,11 +147,9 @@ export function WaterScaleChart({ waterLitres }: WaterScaleChartProps) {
 
   const markerX = mapX(marker.x, anchors.length);
   const markerY = mapY(marker.clampedCentral);
-  const rangeTopY = mapY(marker.clampedHigh);
-  const rangeBottomY = mapY(marker.clampedLow);
-  const markerLabelX = markerX > SVG_WIDTH - 220 ? markerX - 14 : markerX + 14;
-  const markerLabelAnchor = markerX > SVG_WIDTH - 220 ? "end" : "start";
-  const markerLabelY = markerY < CHART_PADDING.top + 32 ? markerY + 26 : markerY - 18;
+  const markerLabelX = Math.max(CHART_PADDING.left + 64, markerX - 18);
+  const markerLabelAnchor = "end";
+  const markerLabelY = Math.max(CHART_PADDING.top + 12, markerY - 18);
 
   function openAnchorTooltip(index: number) {
     const anchor = anchors[index]!;
@@ -181,6 +179,14 @@ export function WaterScaleChart({ waterLitres }: WaterScaleChartProps) {
     });
   }
 
+  function closeAnchorTooltip(id: string) {
+    setActiveTooltip((current) => (current?.kind === "anchor" && current.id === id ? null : current));
+  }
+
+  function closeAiTooltip() {
+    setActiveTooltip((current) => (current?.kind === "ai" ? null : current));
+  }
+
   return (
     <section className="card px-6 py-6 sm:px-8 sm:py-8" data-testid="water-scale-section">
       <div className="max-w-3xl">
@@ -198,11 +204,11 @@ export function WaterScaleChart({ waterLitres }: WaterScaleChartProps) {
 
       <div
         ref={chartRef}
-        className="mt-6 overflow-x-auto"
+        className="mt-6"
         data-testid="water-scale-scroll"
         onMouseLeave={() => setActiveTooltip(null)}
       >
-        <div className="relative min-w-[56rem]" data-testid="water-scale-canvas">
+        <div className="relative" data-testid="water-scale-canvas">
           <svg
             viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
             className="h-auto w-full"
@@ -266,15 +272,16 @@ export function WaterScaleChart({ waterLitres }: WaterScaleChartProps) {
                     role="button"
                     aria-label={`${anchor.label}: ${formatLitres(anchor.litres)}`}
                     onMouseEnter={() => openAnchorTooltip(index)}
+                    onMouseLeave={() => closeAnchorTooltip(anchor.id)}
                     onFocus={() => openAnchorTooltip(index)}
                     onClick={() => openAnchorTooltip(index)}
-                    onBlur={() => setActiveTooltip(null)}
+                    onBlur={() => closeAnchorTooltip(anchor.id)}
                   />
                   <text
                     x={point.x}
                     y={SVG_HEIGHT - CHART_PADDING.bottom + 28}
                     textAnchor="middle"
-                    className="fill-slate-700 text-[12px] font-medium"
+                    className="hidden fill-slate-700 text-[12px] font-medium sm:block"
                   >
                     {labelLines.map((line, lineIndex) => (
                       <tspan key={`${anchor.id}-${line}`} x={point.x} dy={lineIndex === 0 ? 0 : 14}>
@@ -288,12 +295,6 @@ export function WaterScaleChart({ waterLitres }: WaterScaleChartProps) {
                 </g>
               );
             })}
-
-            <g data-testid="water-scale-range">
-              <line x1={markerX} x2={markerX} y1={rangeTopY} y2={rangeBottomY} stroke="#F59E0B" strokeWidth="2" opacity="0.8" />
-              <line x1={markerX - 7} x2={markerX + 7} y1={rangeTopY} y2={rangeTopY} stroke="#F59E0B" strokeWidth="2" opacity="0.8" />
-              <line x1={markerX - 7} x2={markerX + 7} y1={rangeBottomY} y2={rangeBottomY} stroke="#F59E0B" strokeWidth="2" opacity="0.8" />
-            </g>
 
             <g data-testid="water-scale-ai-marker">
               <circle cx={markerX} cy={markerY} r="14" fill="#F59E0B" opacity="0.18" />
@@ -310,11 +311,13 @@ export function WaterScaleChart({ waterLitres }: WaterScaleChartProps) {
                 role="button"
                 aria-label={`Your AI usage: ${formatLitres(marker.central)}`}
                 onMouseEnter={openAiTooltip}
+                onMouseLeave={closeAiTooltip}
                 onFocus={openAiTooltip}
                 onClick={openAiTooltip}
-                onBlur={() => setActiveTooltip(null)}
+                onBlur={closeAiTooltip}
               />
               <text
+                data-testid="water-scale-ai-label"
                 x={markerLabelX}
                 y={markerLabelY}
                 textAnchor={markerLabelAnchor}
@@ -361,6 +364,21 @@ export function WaterScaleChart({ waterLitres }: WaterScaleChartProps) {
             </div>
           ) : null}
         </div>
+
+        <ol className="mt-5 grid gap-3 sm:hidden" data-testid="water-scale-mobile-legend">
+          {anchors.map((anchor) => (
+            <li
+              key={anchor.id}
+              className="flex items-start justify-between gap-3 rounded-lg border border-slate-200/70 bg-white px-3 py-2"
+            >
+              <div className="flex min-w-0 items-start gap-2.5">
+                <span aria-hidden="true" className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-sky-600" />
+                <span className="text-sm font-medium text-ink">{anchor.label}</span>
+              </div>
+              <span className="shrink-0 text-sm text-ink-secondary">{formatScaledLitres(anchor.litres)}</span>
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   );

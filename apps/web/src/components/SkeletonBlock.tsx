@@ -1,7 +1,11 @@
-interface SkeletonBlockProps {
+import type { HTMLAttributes } from "react";
+
+interface SkeletonBlockProps extends HTMLAttributes<HTMLDivElement> {
   className: string;
+  tone?: "default" | "inverse";
 }
 
-export function SkeletonBlock({ className }: SkeletonBlockProps) {
-  return <div className={`animate-pulse rounded-xl border border-slate-200/60 bg-slate-100 ${className}`} />;
+export function SkeletonBlock({ className, tone = "default", ...props }: SkeletonBlockProps) {
+  const toneClassName = tone === "inverse" ? "skeleton-shimmer-inverse" : undefined;
+  return <div className={["skeleton-shimmer", toneClassName, className].filter(Boolean).join(" ")} {...props} />;
 }

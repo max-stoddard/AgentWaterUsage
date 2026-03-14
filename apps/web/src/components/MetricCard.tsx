@@ -52,7 +52,7 @@ export function MetricCard({
             {title}
           </p>
 
-          <p
+          <div
             className={joinClasses(
               "mt-6 font-bold tracking-[-0.04em]",
               featured
@@ -61,12 +61,12 @@ export function MetricCard({
             )}
           >
             {value}
-          </p>
-          <p
+          </div>
+          <div
             className={joinClasses("mt-3 text-[15px] leading-relaxed", featured ? "text-slate-300" : "text-ink-secondary")}
           >
             {detail}
-          </p>
+          </div>
         </div>
 
         {aside ? <div className="min-w-0 lg:justify-self-end">{aside}</div> : null}

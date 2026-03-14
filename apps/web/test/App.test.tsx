@@ -166,6 +166,7 @@ function createReadyOverviewResponse(options?: DashboardResponseOptions) {
         reason: "Token totals are available, but token splits needed for pricing-weighted estimation are missing."
       }
     ],
+    indexing: null,
     diagnostics: {
       state: "ready",
       codexHome: "/tmp/.codex",
@@ -403,6 +404,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   fetchMock.mockReset();
   window.location.hash = "";
@@ -423,7 +425,7 @@ describe("App", () => {
     expect(screen.getByText(/footprint locally\./i)).toBeInTheDocument();
     expect(screen.queryByText(/Local coding agent insights/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Between 500.0 mL and 2.10 L/i)).toBeInTheDocument();
-    expect(screen.getByText(/Based on 9 supported usage events/i)).toBeInTheDocument();
+    expect(screen.getByText(/Based on 47 of your prompts/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /How is this calculated\?/i })).toBeInTheDocument();
     expect(screen.queryByText(/What that looks like/i)).not.toBeInTheDocument();
 
@@ -433,9 +435,10 @@ describe("App", () => {
     expect(within(waterScaleSection).getByTestId("water-scale-chart")).toBeInTheDocument();
     expect(within(waterScaleSection).getByTestId("water-scale-guide")).toBeInTheDocument();
     expect(within(waterScaleSection).getByTestId("water-scale-ai-marker")).toBeInTheDocument();
-    expect(within(waterScaleSection).getByTestId("water-scale-range")).toBeInTheDocument();
-    expect(within(waterScaleSection).getByTestId("water-scale-scroll")).toHaveClass("overflow-x-auto");
-    expect(within(waterScaleSection).getByTestId("water-scale-canvas")).toHaveClass("min-w-[56rem]");
+    expect(within(waterScaleSection).queryByTestId("water-scale-range")).not.toBeInTheDocument();
+    expect(within(waterScaleSection).getByTestId("water-scale-scroll")).not.toHaveClass("overflow-x-auto");
+    expect(within(waterScaleSection).getByTestId("water-scale-canvas")).not.toHaveClass("min-w-[56rem]");
+    expect(within(waterScaleSection).getByTestId("water-scale-mobile-legend")).toBeInTheDocument();
     expect(within(waterScaleSection).getByTestId("water-scale-anchor-cup-of-water")).toBeInTheDocument();
     expect(within(waterScaleSection).getByTestId("water-scale-anchor-person-per-day")).toBeInTheDocument();
     expect(within(waterScaleSection).getByTestId("water-scale-anchor-coffee")).toBeInTheDocument();
@@ -491,7 +494,10 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByText(/Understand your agent/i)).toBeInTheDocument();
+    expect(screen.getByTestId("indexing-status-card")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Scanning local usage files" })).toBeInTheDocument();
     expect(screen.getByTestId("water-usage-card-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("water-usage-value-skeleton")).toHaveClass("skeleton-shimmer");
     expect(screen.getByTestId("water-scale-skeleton")).toBeInTheDocument();
     expect(screen.getByTestId("usage-over-time-skeleton")).toBeInTheDocument();
     expect(screen.getByTestId("coverage-summary-skeleton")).toBeInTheDocument();
@@ -502,6 +508,186 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
     });
+  });
+
+  it("shows the indexing status card below the hero, updates phases, and dismisses it after ready", async () => {
+    const readyOverview = createReadyOverviewResponse();
+    let overviewCalls = 0;
+
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith("/api/overview")) {
+        overviewCalls += 1;
+        if (overviewCalls === 1) {
+          return jsonResponse({
+            ...readyOverview,
+            tokenTotals: {
+              totalTokens: 0,
+              supportedTokens: 0,
+              excludedTokens: 0,
+              unestimatedTokens: 0
+            },
+            waterLitres: {
+              low: 0,
+              central: 0,
+              high: 0
+            },
+            coverage: {
+              supportedEvents: 0,
+              excludedEvents: 0,
+              tokenOnlyEvents: 0
+            },
+            coverageSummary: {
+              sessions: 0,
+              prompts: 0,
+              excludedModels: 0
+            },
+            weeklyGrowth: {
+              sessions: { current: 0, previous: 0, increase: 0 },
+              prompts: { current: 0, previous: 0, increase: 0 },
+              tokens: { current: 0, previous: 0, increase: 0 }
+            },
+            modelUsage: [],
+            coverageDetails: [],
+            exclusions: [],
+            lastIndexedAt: null,
+            calibration: null,
+            indexing: {
+              phase: "discovering",
+              startedAt: Date.parse("2026-03-13T12:00:00.000Z"),
+              updatedAt: Date.parse("2026-03-13T12:00:01.000Z")
+            },
+            diagnostics: {
+              state: "indexing",
+              codexHome: "/tmp/.codex",
+              message: null
+            }
+          });
+        }
+
+        if (overviewCalls === 2) {
+          return jsonResponse({
+            ...readyOverview,
+            tokenTotals: {
+              totalTokens: 0,
+              supportedTokens: 0,
+              excludedTokens: 0,
+              unestimatedTokens: 0
+            },
+            waterLitres: {
+              low: 0,
+              central: 0,
+              high: 0
+            },
+            coverage: {
+              supportedEvents: 0,
+              excludedEvents: 0,
+              tokenOnlyEvents: 0
+            },
+            coverageSummary: {
+              sessions: 0,
+              prompts: 0,
+              excludedModels: 0
+            },
+            weeklyGrowth: {
+              sessions: { current: 0, previous: 0, increase: 0 },
+              prompts: { current: 0, previous: 0, increase: 0 },
+              tokens: { current: 0, previous: 0, increase: 0 }
+            },
+            modelUsage: [],
+            coverageDetails: [],
+            exclusions: [],
+            lastIndexedAt: null,
+            calibration: null,
+            indexing: {
+              phase: "parsing",
+              startedAt: Date.parse("2026-03-13T12:00:00.000Z"),
+              updatedAt: Date.parse("2026-03-13T12:00:02.000Z")
+            },
+            diagnostics: {
+              state: "indexing",
+              codexHome: "/tmp/.codex",
+              message: null
+            }
+          });
+        }
+
+        return jsonResponse(readyOverview);
+      }
+
+      if (url.includes("bucket=day")) {
+        return jsonResponse(createTimeseriesResponse("day", readyOverview.waterLitres));
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(<App />);
+
+    const heroSection = screen.getByText(/Understand your agent/i).closest("section");
+    expect(heroSection).not.toBeNull();
+    expect(await screen.findByText("Scanning local usage files")).toBeInTheDocument();
+    expect(screen.getByTestId("indexing-status-card")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Scanning local usage files" })).toBeInTheDocument();
+    expect(within(heroSection!).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("water-usage-card-skeleton")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(overviewCalls).toBe(2);
+    }, {
+      timeout: 2000
+    });
+    expect(screen.getByText("Reading session history")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Reading session history" })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(overviewCalls).toBe(3);
+    }, {
+      timeout: 2000
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("indexing-status-card")).not.toBeInTheDocument();
+    }, {
+      timeout: 1000
+    });
+    await waitFor(() => {
+      expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("keeps existing overview data visible while the API reports active reindexing", async () => {
+    const readyOverview = createReadyOverviewResponse();
+
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith("/api/overview")) {
+        return jsonResponse({
+          ...readyOverview,
+          indexing: {
+            phase: "estimating",
+            startedAt: Date.parse("2026-03-13T12:00:00.000Z"),
+            updatedAt: Date.parse("2026-03-13T12:00:05.000Z")
+          },
+          diagnostics: {
+            state: "indexing",
+            codexHome: "/tmp/.codex",
+            message: null
+          }
+        });
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("Estimating water, energy, and carbon")).toBeInTheDocument();
+    expect(screen.getByTestId("indexing-status-card")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Estimating water, energy, and carbon" })).toBeInTheDocument();
+    expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("water-scale-section")).toBeInTheDocument();
+    expect(screen.getByText("Agent usage by model")).toBeInTheDocument();
+    expect(screen.queryByTestId("water-chart")).not.toBeInTheDocument();
   });
 
   it("keeps overview sections visible while timeseries loads asynchronously", async () => {
@@ -526,7 +712,7 @@ describe("App", () => {
       expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
     });
 
-    expect(screen.getByText(/Based on 9 supported usage events/i)).toBeInTheDocument();
+    expect(screen.getByText(/Based on 47 of your prompts/i)).toBeInTheDocument();
     expect(screen.getByTestId("water-scale-section")).toBeInTheDocument();
     expect(screen.getByText("Agent usage by model")).toBeInTheDocument();
     expect(screen.getByTestId("usage-over-time-skeleton")).toBeInTheDocument();
@@ -579,8 +765,25 @@ describe("App", () => {
     });
 
     expect(screen.getByTestId("water-scale-ai-marker")).toBeInTheDocument();
-    expect(screen.getByTestId("water-scale-range")).toBeInTheDocument();
+    expect(screen.queryByTestId("water-scale-range")).not.toBeInTheDocument();
     expect(screen.getByText(/Your AI usage/i)).toBeInTheDocument();
+  });
+
+  it("uses singular prompt wording when only one prompt is counted", async () => {
+    mockDashboardResponses({
+      coverageSummary: {
+        sessions: 12,
+        prompts: 1
+      }
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getByText("Based on 1 of your prompt")).toBeInTheDocument();
   });
 
   it("switches time bucket via the toggle and fetches new timeseries", async () => {
@@ -861,47 +1064,45 @@ describe("App", () => {
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
       if (url.startsWith("/api/overview")) {
-        return new Response(
-          JSON.stringify({
-            tokenTotals: {
-              totalTokens: 0,
-              supportedTokens: 0,
-              excludedTokens: 0,
-              unestimatedTokens: 0
-            },
-            waterLitres: {
-              low: 0,
-              central: 0,
-              high: 0
-            },
-            coverage: {
-              supportedEvents: 0,
-              excludedEvents: 0,
-              tokenOnlyEvents: 0
-            },
-            coverageSummary: {
-              sessions: 0,
-              prompts: 0,
-              excludedModels: 0
-            },
-            weeklyGrowth: {
-              sessions: { current: 0, previous: 0, increase: 0 },
-              prompts: { current: 0, previous: 0, increase: 0 },
-              tokens: { current: 0, previous: 0, increase: 0 }
-            },
-            modelUsage: [],
-            coverageDetails: [],
-            diagnostics: {
-              state: "no_data",
-              codexHome: "/home/dev/.codex",
-              message: "No Codex usage files were found in this directory yet."
-            },
-            exclusions: [],
-            lastIndexedAt: null,
-            calibration: null
-          }),
-          { status: 200 }
-        );
+        return jsonResponse({
+          tokenTotals: {
+            totalTokens: 0,
+            supportedTokens: 0,
+            excludedTokens: 0,
+            unestimatedTokens: 0
+          },
+          waterLitres: {
+            low: 0,
+            central: 0,
+            high: 0
+          },
+          coverage: {
+            supportedEvents: 0,
+            excludedEvents: 0,
+            tokenOnlyEvents: 0
+          },
+          coverageSummary: {
+            sessions: 0,
+            prompts: 0,
+            excludedModels: 0
+          },
+          weeklyGrowth: {
+            sessions: { current: 0, previous: 0, increase: 0 },
+            prompts: { current: 0, previous: 0, increase: 0 },
+            tokens: { current: 0, previous: 0, increase: 0 }
+          },
+          modelUsage: [],
+          coverageDetails: [],
+          diagnostics: {
+            state: "no_data",
+            codexHome: "/home/dev/.codex",
+            message: "No Codex usage files were found in this directory yet."
+          },
+          exclusions: [],
+          lastIndexedAt: null,
+          calibration: null,
+          indexing: null
+        });
       }
 
       throw new Error(`Unexpected request: ${url}`);
@@ -909,6 +1110,7 @@ describe("App", () => {
 
     render(<App />);
 
+    expect(screen.getByText(/Understand your agent/i)).toBeInTheDocument();
     expect((await screen.findAllByText(/No local usage history detected/i)).length).toBeGreaterThan(0);
     expect(screen.getByText(/No readable local usage history was found at the current path yet/i)).toBeInTheDocument();
     expect(screen.getByText("No usage files were found in this directory yet.")).toBeInTheDocument();
@@ -920,47 +1122,45 @@ describe("App", () => {
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
       if (url.startsWith("/api/overview")) {
-        return new Response(
-          JSON.stringify({
-            tokenTotals: {
-              totalTokens: 0,
-              supportedTokens: 0,
-              excludedTokens: 0,
-              unestimatedTokens: 0
-            },
-            waterLitres: {
-              low: 0,
-              central: 0,
-              high: 0
-            },
-            coverage: {
-              supportedEvents: 0,
-              excludedEvents: 0,
-              tokenOnlyEvents: 0
-            },
-            coverageSummary: {
-              sessions: 0,
-              prompts: 0,
-              excludedModels: 0
-            },
-            weeklyGrowth: {
-              sessions: { current: 0, previous: 0, increase: 0 },
-              prompts: { current: 0, previous: 0, increase: 0 },
-              tokens: { current: 0, previous: 0, increase: 0 }
-            },
-            modelUsage: [],
-            coverageDetails: [],
-            diagnostics: {
-              state: "read_error",
-              codexHome: "/bad/path/.codex",
-              message: "Configured Codex home does not exist."
-            },
-            exclusions: [],
-            lastIndexedAt: null,
-            calibration: null
-          }),
-          { status: 200 }
-        );
+        return jsonResponse({
+          tokenTotals: {
+            totalTokens: 0,
+            supportedTokens: 0,
+            excludedTokens: 0,
+            unestimatedTokens: 0
+          },
+          waterLitres: {
+            low: 0,
+            central: 0,
+            high: 0
+          },
+          coverage: {
+            supportedEvents: 0,
+            excludedEvents: 0,
+            tokenOnlyEvents: 0
+          },
+          coverageSummary: {
+            sessions: 0,
+            prompts: 0,
+            excludedModels: 0
+          },
+          weeklyGrowth: {
+            sessions: { current: 0, previous: 0, increase: 0 },
+            prompts: { current: 0, previous: 0, increase: 0 },
+            tokens: { current: 0, previous: 0, increase: 0 }
+          },
+          modelUsage: [],
+          coverageDetails: [],
+          diagnostics: {
+            state: "read_error",
+            codexHome: "/bad/path/.codex",
+            message: "Configured Codex home does not exist."
+          },
+          exclusions: [],
+          lastIndexedAt: null,
+          calibration: null,
+          indexing: null
+        });
       }
 
       throw new Error(`Unexpected request: ${url}`);
@@ -968,6 +1168,7 @@ describe("App", () => {
 
     render(<App />);
 
+    expect(screen.getByText(/Understand your agent/i)).toBeInTheDocument();
     expect((await screen.findAllByText(/Could not read local usage data/i)).length).toBeGreaterThan(0);
     expect(screen.getByText(/The dashboard could not read the current local usage path/i)).toBeInTheDocument();
     expect(screen.getByText("Configured data path does not exist.")).toBeInTheDocument();

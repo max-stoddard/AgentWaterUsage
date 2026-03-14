@@ -4,7 +4,9 @@ import { BucketToggle } from "../components/BucketToggle";
 import { CoverageSummary } from "../components/CoverageSummary";
 import { DataStatusPanel } from "../components/DataStatusPanel";
 import { HeroBanner } from "../components/HeroBanner";
+import { IndexingStatusCard } from "../components/IndexingStatusCard";
 import { RoadmapStrip } from "../components/RoadmapStrip";
+import { ScrollReveal } from "../components/ScrollReveal";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { WaterScaleChart } from "../components/WaterScaleChart";
 import { WaterUsageCard, WaterUsageCardSkeleton } from "../components/WaterUsageCard";
@@ -53,6 +55,25 @@ function UsageOverTimeSection({ bucket, loading, error, timeseries, onBucketChan
   );
 }
 
+function hasOverviewContent(overview: OverviewResponse): boolean {
+  return (
+    overview.tokenTotals.totalTokens > 0 ||
+    overview.coverageSummary.sessions > 0 ||
+    overview.coverageSummary.prompts > 0 ||
+    overview.modelUsage.length > 0 ||
+    overview.coverageDetails.length > 0 ||
+    overview.exclusions.length > 0 ||
+    overview.lastIndexedAt !== null ||
+    overview.calibration !== null
+  );
+}
+
+const INITIAL_INDEXING_PLACEHOLDER: NonNullable<OverviewResponse["indexing"]> = {
+  phase: "discovering",
+  startedAt: 0,
+  updatedAt: 0
+};
+
 export function DashboardView({
   bucket,
   overview,
@@ -65,14 +86,20 @@ export function DashboardView({
   onOpenMethodology
 }: DashboardViewProps) {
   const ready = overview?.diagnostics.state === "ready";
-  const showNotReady = overview && !ready;
-  const showData = overview && ready;
-  const showOverviewSkeleton = !overview && (overviewLoading || !overviewError);
+  const indexing = overview?.diagnostics.state === "indexing";
+  const overviewHasContent = overview ? hasOverviewContent(overview) : false;
+  const showNotReady = overview && !ready && !indexing;
+  const showData = overview && (ready || (indexing && overviewHasContent));
+  const showOverviewSkeleton = (!overview && (overviewLoading || !overviewError)) || (Boolean(indexing) && !overviewHasContent);
   const showOverviewError = !overview && overviewError;
+  const indexingCardState = overview?.indexing ?? (!overview && overviewLoading && !overviewError ? INITIAL_INDEXING_PLACEHOLDER : null);
 
   return (
     <div className="space-y-6 lg:space-y-8">
-      <HeroBanner />
+      <div className="space-y-4">
+        <HeroBanner />
+        <IndexingStatusCard indexing={indexingCardState} />
+      </div>
 
       {showOverviewError ? (
         <AlertBanner title="Something went wrong">{overviewError}</AlertBanner>
@@ -84,26 +111,38 @@ export function DashboardView({
           <SkeletonBlock className="h-96" data-testid="coverage-summary-skeleton" />
         </>
       ) : showNotReady ? (
-        <DataStatusPanel diagnostics={overview.diagnostics} />
+        <ScrollReveal>
+          <DataStatusPanel diagnostics={overview.diagnostics} />
+        </ScrollReveal>
       ) : showData ? (
         <>
-          <WaterUsageCard overview={overview} onOpenMethodology={() => onOpenMethodology("water")} />
+          <ScrollReveal>
+            <WaterUsageCard overview={overview} onOpenMethodology={() => onOpenMethodology("water")} />
+          </ScrollReveal>
 
-          <WaterScaleChart waterLitres={overview.waterLitres} />
+          <ScrollReveal delayMs={80}>
+            <WaterScaleChart waterLitres={overview.waterLitres} />
+          </ScrollReveal>
 
-          <UsageOverTimeSection
-            bucket={bucket}
-            loading={!timeseries && (timeseriesLoading || !timeseriesError)}
-            error={timeseries ? null : timeseriesError}
-            timeseries={timeseries}
-            onBucketChange={onBucketChange}
-          />
+          <ScrollReveal delayMs={160}>
+            <UsageOverTimeSection
+              bucket={bucket}
+              loading={!timeseries && (timeseriesLoading || !timeseriesError)}
+              error={timeseries ? null : timeseriesError}
+              timeseries={timeseries}
+              onBucketChange={onBucketChange}
+            />
+          </ScrollReveal>
 
-          <CoverageSummary overview={overview} onOpenMethodology={onOpenMethodology} />
+          <ScrollReveal delayMs={240}>
+            <CoverageSummary overview={overview} onOpenMethodology={onOpenMethodology} />
+          </ScrollReveal>
         </>
       ) : null}
 
-      <RoadmapStrip />
+      <ScrollReveal delayMs={320}>
+        <RoadmapStrip />
+      </ScrollReveal>
     </div>
   );
 }

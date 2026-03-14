@@ -18,6 +18,7 @@ export default function App() {
   const timeZone = useTimeZone();
   const [bucket, setBucket] = useState<Bucket>("day");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
+  const [overviewRequestKey, setOverviewRequestKey] = useState(0);
   const [timeseriesByBucket, setTimeseriesByBucket] = useState<Partial<Record<Bucket, TimeseriesResponse>>>({});
   const [methodology, setMethodology] = useState<MethodologyResponse | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -40,14 +41,12 @@ export default function App() {
     setMethodology(null);
     setOverviewError(null);
     setTimeseriesError(null);
+    setOverviewRequestKey(0);
   }, [loadedTimeZone, timeZone]);
 
   useEffect(() => {
-    if (overview) {
-      return;
-    }
-
     let cancelled = false;
+    let pollTimer: number | null = null;
     setOverviewLoading(true);
     setOverviewError(null);
 
@@ -55,6 +54,11 @@ export default function App() {
       .then((nextOverview) => {
         if (!cancelled) {
           setOverview(nextOverview);
+          if (nextOverview.indexing || nextOverview.diagnostics.state === "indexing") {
+            pollTimer = window.setTimeout(() => {
+              setOverviewRequestKey((current) => current + 1);
+            }, 1000);
+          }
         }
       })
       .catch((caughtError: unknown) => {
@@ -70,8 +74,11 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      if (pollTimer !== null) {
+        window.clearTimeout(pollTimer);
+      }
     };
-  }, [overview, timeZone]);
+  }, [overviewRequestKey, timeZone]);
 
   useEffect(() => {
     if (!overview || overview.diagnostics.state !== "ready" || timeseriesByBucket[bucket]) {

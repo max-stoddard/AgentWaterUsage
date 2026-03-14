@@ -1,14 +1,15 @@
 import type { OverviewResponse } from "@agentic-insights/shared";
 import { formatLitres, formatNumber } from "../lib/format";
 import { MetricCard } from "./MetricCard";
+import { SkeletonBlock } from "./SkeletonBlock";
 
 interface WaterUsageCardProps {
   overview: OverviewResponse;
   onOpenMethodology: () => void;
 }
 
-function LoadingLine({ className }: { className: string }) {
-  return <div className={`animate-pulse rounded-full bg-white/16 ${className}`} />;
+function formatPromptCoverage(prompts: number): string {
+  return `Based on ${formatNumber(prompts)} of your ${prompts === 1 ? "prompt" : "prompts"}`;
 }
 
 export function WaterUsageCard({ overview, onOpenMethodology }: WaterUsageCardProps) {
@@ -21,7 +22,7 @@ export function WaterUsageCard({ overview, onOpenMethodology }: WaterUsageCardPr
       detail={`Between ${formatLitres(overview.waterLitres.low)} and ${formatLitres(overview.waterLitres.high)}`}
       footer={
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span>Based on {formatNumber(overview.coverage.supportedEvents)} supported usage events</span>
+          <span>{formatPromptCoverage(overview.coverageSummary.prompts)}</span>
           <button
             type="button"
             onClick={onOpenMethodology}
@@ -52,19 +53,23 @@ export function WaterUsageCardSkeleton() {
         title="Estimated from your local coding agent activity"
         value={
           <div className="max-w-[22rem]">
-            <LoadingLine className="h-10 w-40 sm:h-12 sm:w-52 lg:h-16 lg:w-64" />
+            <SkeletonBlock
+              className="h-10 w-40 rounded-full sm:h-12 sm:w-52 lg:h-16 lg:w-64"
+              tone="inverse"
+              data-testid="water-usage-value-skeleton"
+            />
           </div>
         }
         detail={
           <div className="space-y-2">
-            <LoadingLine className="h-4 w-56 max-w-full" />
-            <LoadingLine className="h-4 w-44 max-w-full" />
+            <SkeletonBlock className="h-4 w-56 max-w-full rounded-full" tone="inverse" />
+            <SkeletonBlock className="h-4 w-44 max-w-full rounded-full" tone="inverse" />
           </div>
         }
         footer={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <LoadingLine className="h-4 w-52 max-w-full" />
-            <LoadingLine className="h-9 w-40 rounded-lg max-w-full" />
+            <SkeletonBlock className="h-4 w-52 max-w-full rounded-full" tone="inverse" />
+            <SkeletonBlock className="h-9 w-40 max-w-full rounded-lg" tone="inverse" />
           </div>
         }
         tone="feature"

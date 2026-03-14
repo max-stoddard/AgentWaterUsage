@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FOOTPRINT_TEXT_CLASS_BY_PROPERTY } from "../lib/footprint";
+import { useReducedMotion } from "../lib/useReducedMotion";
 
 const words = [
   { key: "token", label: "tokens" },
@@ -7,27 +8,6 @@ const words = [
   { key: "energy", label: "energy" },
   { key: "carbon", label: "carbon" }
 ] as const;
-
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(media.matches);
-    update();
-    media.addEventListener?.("change", update);
-
-    return () => {
-      media.removeEventListener?.("change", update);
-    };
-  }, []);
-
-  return reduced;
-}
 
 export function HeroBanner() {
   const reducedMotion = useReducedMotion();
