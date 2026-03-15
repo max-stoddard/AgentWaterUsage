@@ -45,8 +45,8 @@ export function BucketToggle({ active, onChange }: BucketToggleProps) {
   return (
     <div
       role="tablist"
-      aria-label="Water aggregation"
-      className="inline-flex w-full rounded-lg bg-surface-muted p-1 sm:w-auto"
+      aria-label="Usage aggregation"
+      className="inline-flex self-start rounded-lg bg-surface-muted p-1"
     >
       {options.map((option, index) => {
         const selected = option.value === active;

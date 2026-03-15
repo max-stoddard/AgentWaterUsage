@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCompactNumber, formatScaledLitres, formatUsdCost } from "../src/lib/format";
+import { formatCarbon, formatCarbonIntensity, formatCompactNumber, formatEnergy, formatScaledLitres, formatUsdCost } from "../src/lib/format";
 
 describe("formatCompactNumber", () => {
   it("formats small values without suffixes", () => {
@@ -33,5 +33,35 @@ describe("formatUsdCost", () => {
 
   it("formats multi-dollar values as standard currency", () => {
     expect(formatUsdCost(12.5)).toBe("$12.50");
+  });
+});
+
+describe("formatEnergy", () => {
+  it("formats sub-kilowatt-hour values as watt-hours", () => {
+    expect(formatEnergy(0.004)).toBe("4.0 Wh");
+    expect(formatEnergy(0.168)).toBe("168 Wh");
+  });
+
+  it("formats larger values as kilowatt-hours", () => {
+    expect(formatEnergy(1.25)).toBe("1.25 kWh");
+    expect(formatEnergy(12.4)).toBe("12.4 kWh");
+  });
+});
+
+describe("formatCarbon", () => {
+  it("formats sub-kilogram values as grams of CO2", () => {
+    expect(formatCarbon(0.00178)).toBe("1.8 g CO2");
+    expect(formatCarbon(0.07476)).toBe("75 g CO2");
+  });
+
+  it("formats larger values as kilograms of CO2", () => {
+    expect(formatCarbon(1.25)).toBe("1.25 kg CO2");
+    expect(formatCarbon(12.4)).toBe("12.4 kg CO2");
+  });
+});
+
+describe("formatCarbonIntensity", () => {
+  it("formats electricity carbon intensity in grams per kilowatt-hour", () => {
+    expect(formatCarbonIntensity(0.445)).toBe("445 g CO2/kWh");
   });
 });

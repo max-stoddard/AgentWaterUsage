@@ -1,16 +1,18 @@
+import { useState } from "react";
 import type { Bucket, MethodologyTabId, OverviewResponse, TimeseriesResponse } from "@agentic-insights/shared";
 import { AlertBanner } from "../components/AlertBanner";
 import { BucketToggle } from "../components/BucketToggle";
 import { CoverageSummary } from "../components/CoverageSummary";
 import { DataStatusPanel } from "../components/DataStatusPanel";
 import { HeroBanner } from "../components/HeroBanner";
+import { ImpactMetricToggle } from "../components/ImpactMetricToggle";
 import { IndexingStatusCard } from "../components/IndexingStatusCard";
-import { RoadmapStrip } from "../components/RoadmapStrip";
 import { ScrollReveal } from "../components/ScrollReveal";
 import { SkeletonBlock } from "../components/SkeletonBlock";
 import { WaterScaleChart } from "../components/WaterScaleChart";
-import { WaterUsageCard, WaterUsageCardSkeleton } from "../components/WaterUsageCard";
-import { WaterChart } from "../components/WaterChart";
+import { CarbonUsageCard, EnergyUsageCard, UsageCardsSkeleton, WaterUsageCard } from "../components/WaterUsageCard";
+import { ImpactChart } from "../components/WaterChart";
+import type { ImpactMetric } from "../lib/footprint";
 
 interface DashboardViewProps {
   bucket: Bucket;
@@ -33,11 +35,16 @@ interface UsageOverTimeSectionProps {
 }
 
 function UsageOverTimeSection({ bucket, loading, error, timeseries, onBucketChange }: UsageOverTimeSectionProps) {
+  const [metric, setMetric] = useState<ImpactMetric>("water");
+
   return (
     <section className="card px-6 py-6 sm:px-8 sm:py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <h2 className="text-base font-semibold text-ink">Usage over time</h2>
-        <BucketToggle active={bucket} onChange={onBucketChange} />
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <ImpactMetricToggle active={metric} onChange={setMetric} />
+          <BucketToggle active={bucket} onChange={onBucketChange} />
+        </div>
       </div>
 
       {loading ? (
@@ -49,7 +56,7 @@ function UsageOverTimeSection({ bucket, loading, error, timeseries, onBucketChan
           <AlertBanner title="Could not load usage over time">{error}</AlertBanner>
         </div>
       ) : timeseries ? (
-        <WaterChart points={timeseries.points} />
+        <ImpactChart metric={metric} points={timeseries.points} />
       ) : null}
     </section>
   );
@@ -58,6 +65,8 @@ function UsageOverTimeSection({ bucket, loading, error, timeseries, onBucketChan
 function hasOverviewContent(overview: OverviewResponse): boolean {
   return (
     overview.tokenTotals.totalTokens > 0 ||
+    overview.energyKwh > 0 ||
+    overview.carbonKgCo2 > 0 ||
     overview.coverageSummary.sessions > 0 ||
     overview.coverageSummary.prompts > 0 ||
     overview.modelUsage.length > 0 ||
@@ -105,9 +114,9 @@ export function DashboardView({
         <AlertBanner title="Something went wrong">{overviewError}</AlertBanner>
       ) : showOverviewSkeleton ? (
         <>
-          <WaterUsageCardSkeleton />
-          <SkeletonBlock className="h-[34rem]" data-testid="water-scale-skeleton" />
+          <UsageCardsSkeleton />
           <UsageOverTimeSection bucket={bucket} loading error={null} timeseries={null} onBucketChange={onBucketChange} />
+          <SkeletonBlock className="h-[34rem]" data-testid="water-scale-skeleton" />
           <SkeletonBlock className="h-96" data-testid="coverage-summary-skeleton" />
         </>
       ) : showNotReady ? (
@@ -117,14 +126,16 @@ export function DashboardView({
       ) : showData ? (
         <>
           <ScrollReveal>
-            <WaterUsageCard overview={overview} onOpenMethodology={() => onOpenMethodology("water")} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="lg:col-span-2">
+                <WaterUsageCard overview={overview} onOpenMethodology={() => onOpenMethodology("water")} />
+              </div>
+              <EnergyUsageCard overview={overview} onOpenMethodology={() => onOpenMethodology("energy")} />
+              <CarbonUsageCard overview={overview} onOpenMethodology={() => onOpenMethodology("carbon")} />
+            </div>
           </ScrollReveal>
 
           <ScrollReveal delayMs={80}>
-            <WaterScaleChart waterLitres={overview.waterLitres} />
-          </ScrollReveal>
-
-          <ScrollReveal delayMs={160}>
             <UsageOverTimeSection
               bucket={bucket}
               loading={!timeseries && (timeseriesLoading || !timeseriesError)}
@@ -134,15 +145,15 @@ export function DashboardView({
             />
           </ScrollReveal>
 
+          <ScrollReveal delayMs={160}>
+            <WaterScaleChart waterLitres={overview.waterLitres} />
+          </ScrollReveal>
+
           <ScrollReveal delayMs={240}>
             <CoverageSummary overview={overview} onOpenMethodology={onOpenMethodology} />
           </ScrollReveal>
         </>
       ) : null}
-
-      <ScrollReveal delayMs={320}>
-        <RoadmapStrip />
-      </ScrollReveal>
     </div>
   );
 }

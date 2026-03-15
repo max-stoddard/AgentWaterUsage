@@ -222,24 +222,26 @@ export default function App() {
 
   return (
     <main className="min-h-screen bg-surface-page">
-      <div className="mx-auto max-w-5xl px-6 py-8 sm:px-8 lg:px-12 lg:py-10">
+      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-6 pb-6 sm:px-8 sm:pb-8 lg:px-12 lg:pb-10">
         <Header onOpenMethodology={openMethodology} />
 
-        <DashboardView
-          bucket={bucket}
-          overview={overview}
-          overviewLoading={overviewLoading}
-          overviewError={overviewError}
-          timeseries={activeTimeseries}
-          timeseriesLoading={timeseriesLoading}
-          timeseriesError={timeseriesError}
-          onBucketChange={(nextBucket) => {
-            startTransition(() => {
-              setBucket(nextBucket);
-            });
-          }}
-          onOpenMethodology={openMethodology}
-        />
+        <div className="flex-1">
+          <DashboardView
+            bucket={bucket}
+            overview={overview}
+            overviewLoading={overviewLoading}
+            overviewError={overviewError}
+            timeseries={activeTimeseries}
+            timeseriesLoading={timeseriesLoading}
+            timeseriesError={timeseriesError}
+            onBucketChange={(nextBucket) => {
+              startTransition(() => {
+                setBucket(nextBucket);
+              });
+            }}
+            onOpenMethodology={openMethodology}
+          />
+        </div>
 
         <DashboardFooter lastIndexedAt={overview?.lastIndexedAt ?? null} timeZone={timeZone} />
       </div>

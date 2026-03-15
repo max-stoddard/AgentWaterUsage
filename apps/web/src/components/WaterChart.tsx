@@ -2,25 +2,26 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import type { TimeseriesPoint } from "@agentic-insights/shared";
 import { Bar, BarChart, CartesianGrid, Cell, Rectangle, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { IMPACT_METRIC_DEFINITION, getImpactMetricValue, type ImpactMetric } from "../lib/footprint";
 import { formatLitres, formatNumber } from "../lib/format";
 
-interface WaterChartProps {
+interface ImpactChartProps {
+  metric: ImpactMetric;
   points: TimeseriesPoint[];
 }
 
 interface ChartDatum {
   key: string;
   label: string;
-  central: number;
-  low: number;
-  high: number;
+  value: number;
+  low: number | null;
+  high: number | null;
   tokens: number;
-  excludedTokens: number;
-  unestimatedTokens: number;
 }
 
 interface TooltipContentProps {
   active?: boolean;
+  metric: ImpactMetric;
   payload?: Array<{ payload: ChartDatum }>;
 }
 
@@ -28,19 +29,68 @@ interface ChartBarShapeProps extends ComponentProps<typeof Rectangle> {
   payload?: ChartDatum;
 }
 
+interface ChartTheme {
+  fillId: string;
+  start: string;
+  end: string;
+  activeFill: string;
+  activeStroke: string;
+  background: string;
+  cursor: string;
+  gridStroke: string;
+  shell: string;
+}
+
 const MAX_VISIBLE_LABELS = 5;
 const MIN_CHART_HEIGHT = 280;
 
-function toChartData(points: TimeseriesPoint[]): ChartDatum[] {
+const CHART_THEME_BY_METRIC: Record<ImpactMetric, ChartTheme> = {
+  water: {
+    fillId: "water-bar-fill",
+    start: "#0EA5E9",
+    end: "#38BDF8",
+    activeFill: "#0284C7",
+    activeStroke: "#E0F2FE",
+    background: "rgba(186, 230, 253, 0.28)",
+    cursor: "rgba(14, 165, 233, 0.08)",
+    gridStroke: "#DDEAF5",
+    shell:
+      "min-w-0 h-72 overflow-hidden rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.95),rgba(248,250,252,0.88))] px-3 pb-3 pt-4 sm:h-80 sm:px-4"
+  },
+  energy: {
+    fillId: "energy-bar-fill",
+    start: "#F59E0B",
+    end: "#FBBF24",
+    activeFill: "#D97706",
+    activeStroke: "#FEF3C7",
+    background: "rgba(253, 230, 138, 0.26)",
+    cursor: "rgba(245, 158, 11, 0.10)",
+    gridStroke: "#FDE7C2",
+    shell:
+      "min-w-0 h-72 overflow-hidden rounded-2xl border border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(255,247,237,0.92))] px-3 pb-3 pt-4 sm:h-80 sm:px-4"
+  },
+  carbon: {
+    fillId: "carbon-bar-fill",
+    start: "#475569",
+    end: "#64748B",
+    activeFill: "#334155",
+    activeStroke: "#E2E8F0",
+    background: "rgba(203, 213, 225, 0.30)",
+    cursor: "rgba(71, 85, 105, 0.10)",
+    gridStroke: "#E2E8F0",
+    shell:
+      "min-w-0 h-72 overflow-hidden rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.92))] px-3 pb-3 pt-4 sm:h-80 sm:px-4"
+  }
+};
+
+function toChartData(points: TimeseriesPoint[], metric: ImpactMetric): ChartDatum[] {
   return points.map((point) => ({
     key: point.key,
     label: point.label,
-    central: point.waterLitres.central,
-    low: point.waterLitres.low,
-    high: point.waterLitres.high,
-    tokens: point.tokens,
-    excludedTokens: point.excludedTokens,
-    unestimatedTokens: point.unestimatedTokens
+    value: getImpactMetricValue(metric, point),
+    low: metric === "water" ? point.waterLitres.low : null,
+    high: metric === "water" ? point.waterLitres.high : null,
+    tokens: point.tokens
   }));
 }
 
@@ -52,23 +102,59 @@ function getXAxisInterval(pointCount: number): number {
   return Math.ceil(pointCount / MAX_VISIBLE_LABELS) - 1;
 }
 
-function formatAxisLitres(value: number): string {
+function formatAxisValue(metric: ImpactMetric, value: number): string {
   if (value === 0) {
     return "0";
   }
 
+  if (metric === "water") {
+    if (Math.abs(value) < 1) {
+      return `${Math.round(value * 1000)}mL`;
+    }
+
+    if (Math.abs(value) < 10) {
+      return `${value.toFixed(1)}L`;
+    }
+
+    return `${Math.round(value)}L`;
+  }
+
+  if (metric === "energy") {
+    if (Math.abs(value) < 1) {
+      return `${Math.round(value * 1000)}Wh`;
+    }
+
+    if (Math.abs(value) < 10) {
+      return `${value.toFixed(1)}kWh`;
+    }
+
+    return `${Math.round(value)}kWh`;
+  }
+
   if (Math.abs(value) < 1) {
-    return `${Math.round(value * 1000)}mL`;
+    return `${Math.round(value * 1000)}g`;
   }
 
   if (Math.abs(value) < 10) {
-    return `${value.toFixed(1)}L`;
+    return `${value.toFixed(2)}kg`;
   }
 
-  return `${Math.round(value)}L`;
+  return `${value.toFixed(1)}kg`;
 }
 
-function ChartTooltipContent({ active, payload }: TooltipContentProps) {
+function tooltipDetail(metric: ImpactMetric, point: ChartDatum): string {
+  if (metric === "water" && point.low !== null && point.high !== null) {
+    return `Between ${formatLitres(point.low)} and ${formatLitres(point.high)}`;
+  }
+
+  if (metric === "energy") {
+    return "Benchmark-based estimate from the same priced token activity.";
+  }
+
+  return "Derived from the same energy estimate using a global electricity CO2 factor.";
+}
+
+function ChartTooltipContent({ active, metric, payload }: TooltipContentProps) {
   const point = active ? payload?.[0]?.payload : undefined;
 
   if (!point) {
@@ -77,28 +163,27 @@ function ChartTooltipContent({ active, payload }: TooltipContentProps) {
 
   return (
     <div
-      data-testid="water-chart-tooltip"
-      className="w-[180px] rounded-lg border border-slate-800/70 bg-slate-950/95 px-3 py-2.5 text-white shadow-2xl backdrop-blur"
+      data-testid="impact-chart-tooltip"
+      className="w-[220px] rounded-lg border border-slate-800/70 bg-slate-950/95 px-3 py-2.5 text-white shadow-2xl backdrop-blur"
     >
       <p className="text-xs font-medium text-slate-400">{point.label}</p>
-      <p className="mt-1 text-lg font-bold tracking-[-0.03em]">{formatLitres(point.central)}</p>
-      <p className="mt-0.5 text-xs text-slate-400">
-        Between {formatLitres(point.low)} and {formatLitres(point.high)}
-      </p>
+      <p className="mt-1 text-lg font-bold tracking-[-0.03em]">{IMPACT_METRIC_DEFINITION[metric].formatter(point.value)}</p>
+      <p className="mt-0.5 text-xs text-slate-400">{tooltipDetail(metric, point)}</p>
       <p className="mt-1 text-xs text-slate-400">{formatNumber(point.tokens)} tokens</p>
     </div>
   );
 }
 
 function ChartBarShape({ payload, ...shapeProps }: ChartBarShapeProps) {
-  return <Rectangle {...shapeProps} data-testid={payload ? `water-bar-${payload.key}` : undefined} />;
+  return <Rectangle {...shapeProps} data-testid={payload ? `impact-bar-${payload.key}` : undefined} />;
 }
 
-export function WaterChart({ points }: WaterChartProps) {
-  const chartData = useMemo(() => toChartData(points), [points]);
+export function ImpactChart({ metric, points }: ImpactChartProps) {
+  const chartData = useMemo(() => toChartData(points, metric), [metric, points]);
   const xAxisInterval = useMemo(() => getXAxisInterval(chartData.length), [chartData.length]);
   const chartRef = useRef<HTMLDivElement>(null);
   const [chartSize, setChartSize] = useState({ width: 0, height: MIN_CHART_HEIGHT });
+  const theme = CHART_THEME_BY_METRIC[metric];
 
   useEffect(() => {
     const element = chartRef.current;
@@ -144,33 +229,29 @@ export function WaterChart({ points }: WaterChartProps) {
   if (chartData.length === 0) {
     return (
       <div className="mt-6 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-ink-secondary">
-        No water estimate available for this time range.
+        No {IMPACT_METRIC_DEFINITION[metric].emptyStateLabel} estimate available for this time range.
       </div>
     );
   }
 
   return (
     <div className="mt-6">
-      <div
-        ref={chartRef}
-        data-testid="water-chart"
-        className="min-w-0 h-72 overflow-hidden rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(240,249,255,0.95),rgba(248,250,252,0.88))] px-3 pb-2 pt-4 sm:h-80 sm:px-4"
-      >
+      <div ref={chartRef} data-testid="impact-chart" className={theme.shell}>
         {chartSize.width > 0 ? (
           <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
             <BarChart
               data={chartData}
-              margin={{ top: 8, right: 8, bottom: 12, left: 0 }}
+              margin={{ top: 8, right: 16, bottom: 18, left: 0 }}
               barCategoryGap={chartData.length > 12 ? "24%" : "32%"}
             >
               <defs>
-                <linearGradient id="water-bar-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0EA5E9" />
-                  <stop offset="100%" stopColor="#38BDF8" />
+                <linearGradient id={theme.fillId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={theme.start} />
+                  <stop offset="100%" stopColor={theme.end} />
                 </linearGradient>
               </defs>
 
-              <CartesianGrid vertical={false} stroke="#DDEAF5" strokeDasharray="3 6" />
+              <CartesianGrid vertical={false} stroke={theme.gridStroke} strokeDasharray="3 6" />
 
               <XAxis
                 dataKey="label"
@@ -185,23 +266,23 @@ export function WaterChart({ points }: WaterChartProps) {
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                width={52}
+                width={56}
                 tick={{ fill: "#94A3B8", fontSize: 11 }}
-                tickFormatter={formatAxisLitres}
+                tickFormatter={(value) => formatAxisValue(metric, value)}
               />
 
               <Tooltip
-                cursor={{ fill: "rgba(14, 165, 233, 0.08)" }}
-                content={<ChartTooltipContent />}
+                cursor={{ fill: theme.cursor }}
+                content={<ChartTooltipContent metric={metric} />}
                 wrapperStyle={{ outline: "none" }}
               />
 
               <Bar
-                dataKey="central"
+                dataKey="value"
                 radius={[12, 12, 4, 4]}
-                fill="url(#water-bar-fill)"
-                activeBar={{ fill: "#0284C7", stroke: "#E0F2FE", strokeWidth: 1.25 }}
-                background={{ fill: "rgba(186, 230, 253, 0.28)" }}
+                fill={`url(#${theme.fillId})`}
+                activeBar={{ fill: theme.activeFill, stroke: theme.activeStroke, strokeWidth: 1.25 }}
+                background={{ fill: theme.background }}
                 minPointSize={chartData.length > 1 ? 3 : 6}
                 shape={<ChartBarShape />}
               >

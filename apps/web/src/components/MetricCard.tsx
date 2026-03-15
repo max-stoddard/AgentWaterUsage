@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 
 interface MetricCardProps {
   eyebrow: string;
-  title: string;
+  title?: string;
   value: ReactNode;
-  detail: ReactNode;
+  detail?: ReactNode;
   footer?: ReactNode;
   aside?: ReactNode;
-  tone?: "default" | "feature";
+  tone?: "default" | "water" | "energy" | "carbon";
   className?: string;
   eyebrowClassName?: string;
 }
@@ -27,13 +27,48 @@ export function MetricCard({
   className,
   eyebrowClassName
 }: MetricCardProps) {
-  const featured = tone === "feature";
+  const toneClasses =
+    tone === "water"
+      ? {
+          card: "bg-[linear-gradient(135deg,rgba(2,132,199,1),rgba(15,23,42,0.96))] text-white shadow-lg",
+          eyebrow: "text-sky-200",
+          title: "text-slate-200",
+          value: "text-4xl text-white sm:text-5xl lg:text-6xl",
+          detail: "text-slate-200",
+          footer: "border-t border-white/10 text-slate-300"
+        }
+      : tone === "energy"
+        ? {
+            card: "bg-[linear-gradient(135deg,rgba(254,243,199,1),rgba(245,158,11,0.28))] text-slate-950 shadow-lg shadow-amber-950/5 ring-1 ring-amber-200/80",
+            eyebrow: "text-amber-900/80",
+            title: "text-amber-950/70",
+            value: "text-3xl text-slate-950 sm:text-4xl lg:text-5xl",
+            detail: "text-amber-950/75",
+            footer: "border-t border-amber-950/10 text-amber-950/70"
+          }
+        : tone === "carbon"
+          ? {
+              card: "bg-[linear-gradient(135deg,rgba(241,245,249,1),rgba(71,85,105,0.22))] text-slate-950 shadow-lg shadow-slate-950/5 ring-1 ring-slate-300/80",
+              eyebrow: "text-slate-700",
+              title: "text-slate-700/80",
+              value: "text-3xl text-slate-950 sm:text-4xl lg:text-5xl",
+              detail: "text-slate-700/80",
+              footer: "border-t border-slate-900/10 text-slate-700/80"
+            }
+        : {
+            card: "card",
+            eyebrow: "text-ink-secondary",
+            title: "text-ink-secondary",
+            value: "text-3xl text-ink sm:text-4xl",
+            detail: "text-ink-secondary",
+            footer: "border-t border-slate-200/60 text-ink-secondary"
+          };
 
   return (
     <article
       className={joinClasses(
         "flex flex-col rounded-xl p-6 sm:p-8",
-        featured ? "card-dark" : "card",
+        toneClasses.card,
         className
       )}
     >
@@ -42,31 +77,23 @@ export function MetricCard({
           <p
             className={joinClasses(
               "text-sm font-medium",
-              featured ? "text-accent-light" : "text-ink-secondary",
+              toneClasses.eyebrow,
               eyebrowClassName
             )}
           >
             {eyebrow}
           </p>
-          <p className={joinClasses("mt-1.5 text-sm", featured ? "text-slate-300" : "text-ink-secondary")}>
-            {title}
-          </p>
+          {title ? <p className={joinClasses("mt-1.5 text-sm", toneClasses.title)}>{title}</p> : null}
 
           <div
             className={joinClasses(
-              "mt-6 font-bold tracking-[-0.04em]",
-              featured
-                ? "text-4xl text-white sm:text-5xl lg:text-6xl"
-                : "text-3xl text-ink sm:text-4xl"
+              title ? "mt-6 font-bold tracking-[-0.04em]" : "mt-4 font-bold tracking-[-0.04em]",
+              toneClasses.value
             )}
           >
             {value}
           </div>
-          <div
-            className={joinClasses("mt-3 text-[15px] leading-relaxed", featured ? "text-slate-300" : "text-ink-secondary")}
-          >
-            {detail}
-          </div>
+          {detail ? <div className={joinClasses("mt-3 text-[15px] leading-relaxed", toneClasses.detail)}>{detail}</div> : null}
         </div>
 
         {aside ? <div className="min-w-0 lg:justify-self-end">{aside}</div> : null}
@@ -76,7 +103,7 @@ export function MetricCard({
         <div
           className={joinClasses(
             "mt-auto pt-5 text-sm",
-            featured ? "border-t border-white/10 text-slate-400" : "border-t border-slate-200/60 text-ink-secondary"
+            toneClasses.footer
           )}
         >
           {footer}

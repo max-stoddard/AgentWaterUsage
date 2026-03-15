@@ -6,7 +6,7 @@ import {
   type MethodologyTabId,
   type OverviewResponse
 } from "@agentic-insights/shared";
-import { formatLitres, formatNumber } from "../lib/format";
+import { formatCarbon, formatCarbonIntensity, formatEnergy, formatLitres, formatNumber } from "../lib/format";
 import { MethodologySourceCard } from "./MethodologySourceCard";
 import { ModelUsageList } from "./ModelUsageList";
 import { ModelUsageStatusKey } from "./ModelUsageStatusKey";
@@ -34,6 +34,28 @@ const WATER_REFERENCE_DESCRIPTION_BY_URL: Record<string, string> = {
     "Overview article explaining why AI systems consume freshwater and how water demand shifts across infrastructure and regions.",
   "https://arxiv.org/abs/2304.03271":
     "Research paper quantifying the hidden operational water footprint of modern AI models and the data centers behind them."
+};
+const ENERGY_REFERENCE_DESCRIPTION_BY_URL: Record<string, string> = {
+  "https://doi.org/10.1145/3724499":
+    "Friendly overview of how one AI request can translate into both water use and electricity demand across data-center infrastructure.",
+  "https://arxiv.org/abs/2304.03271":
+    "Technical paper behind the benchmark request assumptions used here to anchor the energy estimate.",
+  "https://papers.nips.cc/paper/2020/file/1457c0d6bfcb4967418bfb8ac142f64a-Paper.pdf":
+    "The GPT-3 paper reports the 0.4 kWh per 100 pages result that Li et al. use to derive a per-request energy benchmark.",
+  "https://jmlr.org/papers/v24/23-0069.html":
+    "Measured deployment study showing that real-world energy use depends heavily on hardware and runtime setup, which is why this dashboard treats energy as directional."
+};
+const CARBON_REFERENCE_DESCRIPTION_BY_URL: Record<string, string> = {
+  "https://www.iea.org/reports/electricity-2025/emissions":
+    "The IEA reports a 2024 global average electricity emissions intensity of 445 g CO2 per kWh, which this dashboard uses as its default carbon conversion factor.",
+  "https://ghgprotocol.org/scope_2_guidance":
+    "Explains why location-based electricity factors are a standard way to estimate scope 2 emissions when you do not have supplier-specific data.",
+  "https://ghgprotocol.org/scope-2-frequently-asked-questions":
+    "Plain-English companion to the Scope 2 guidance, helpful for understanding location-based versus market-based electricity accounting.",
+  "https://doi.org/10.1145/3724499":
+    "Friendly overview of the benchmark request energy assumptions that the carbon estimate inherits.",
+  "https://arxiv.org/abs/2304.03271":
+    "Technical paper behind the benchmark request energy figure that is converted into carbon here."
 };
 const WATER_COMPARISON_BY_URL = new Map(WATER_SCALE_COMPARISONS.map((comparison) => [comparison.sourceUrl, comparison]));
 
@@ -170,6 +192,42 @@ export function MethodologyDrawer({ open, methodology, overview, defaultTab, loa
         };
       }
 
+      if (activeTab === "energy") {
+        return {
+          title: link.label,
+          href: link.url,
+          ...(link.url === "https://arxiv.org/abs/2304.03271"
+            ? {
+                value: formatEnergy(methodology!.energyBenchmarkKwh)
+              }
+            : {}),
+          description:
+            ENERGY_REFERENCE_DESCRIPTION_BY_URL[link.url] ??
+            "Reference used to explain or benchmark the AI energy-estimation methodology."
+        };
+      }
+
+      if (activeTab === "carbon") {
+        return {
+          title: link.label,
+          href: link.url,
+          ...(link.url === "https://www.iea.org/reports/electricity-2025/emissions"
+            ? {
+                value: formatCarbonIntensity(methodology!.carbonIntensityKgCo2PerKwh)
+              }
+            : {}),
+          ...(link.url === "https://arxiv.org/abs/2304.03271"
+            ? {
+                badges: ["Benchmark request"],
+                value: formatCarbon(methodology!.carbonBenchmarkKgCo2)
+              }
+            : {}),
+          description:
+            CARBON_REFERENCE_DESCRIPTION_BY_URL[link.url] ??
+            "Reference used to explain or benchmark the AI carbon-estimation methodology."
+        };
+      }
+
       return {
         title: link.label,
         href: link.url
@@ -269,7 +327,7 @@ export function MethodologyDrawer({ open, methodology, overview, defaultTab, loa
                     <div className="mt-3 space-y-3 text-sm leading-relaxed text-ink-secondary">
                       <p>
                         Sessions are distinct Codex and Claude Code runs. Prompts count readable user turns from local
-                        logs, not just the turns that had enough token detail for water estimation.
+                        logs, not just the turns that had enough token detail for footprint estimation.
                       </p>
                       <p>
                         Agent usage is grouped by canonical provider and model so repeated dated Claude IDs roll up into
@@ -394,14 +452,14 @@ export function MethodologyDrawer({ open, methodology, overview, defaultTab, loa
                 <div className="space-y-8">
                   <section>
                     <p className="text-[15px] leading-relaxed text-ink-secondary">
-                      Water estimates are calculated from local coding-agent token activity using pricing-weighted
-                      normalization and published benchmark coefficients.
+                      Water starts with the same priced token activity explained in Prompts. From there, each supported
+                      event is normalized against your own median event cost and then mapped onto published water
+                      benchmark coefficients.
                     </p>
                     <p className="mt-3 text-sm leading-relaxed text-ink-secondary">
-                      The scale chart mixes direct intake, embedded product footprints, and operational water use so
-                      you can read your AI estimate as an order-of-magnitude marker rather than a like-for-like total.
-                      Hovering the chart reveals what each point means, and the source cards below explain where each
-                      comparison comes from.
+                      So this number is best read as context, not as a literal meter reading from your machine. The
+                      scale chart mixes direct intake, embedded product footprints, and operational water use so you
+                      can get a feel for the order of magnitude rather than make a like-for-like comparison.
                     </p>
                   </section>
 
@@ -437,12 +495,13 @@ export function MethodologyDrawer({ open, methodology, overview, defaultTab, loa
                     <div className="mt-3 rounded-lg bg-surface-muted px-4 py-3">
                       {methodology.calibration ? (
                         <p className="text-sm leading-relaxed text-ink-secondary">
-                          Median event cost: {methodology.calibration.referenceEventCostUsd.toFixed(6)} USD across{" "}
+                          Right now the shared anchor is a median event cost of{" "}
+                          {methodology.calibration.referenceEventCostUsd.toFixed(6)} USD across{" "}
                           {formatNumber(methodology.calibration.supportedEventCount)} supported events.
                         </p>
                       ) : (
                         <p className="text-sm leading-relaxed text-ink-secondary">
-                          No supported events available for calibration yet.
+                          No supported events are available for calibration yet, so there is nothing to scale against.
                         </p>
                       )}
                     </div>
@@ -485,14 +544,47 @@ export function MethodologyDrawer({ open, methodology, overview, defaultTab, loa
               ) : null}
 
               {activeTab === "energy" ? (
-                <div className="space-y-6">
+                <div className="space-y-8">
                   <section className="space-y-3">
                     <p className="text-[15px] leading-relaxed text-ink-secondary">
-                      Energy estimates are not live yet. This tab will explain how token activity maps to electricity
-                      use once the model is implemented.
+                      Energy uses the same pricing-weighted normalization step as water, then converts that normalized
+                      event into electricity use with a published benchmark anchor.
                     </p>
-                    <div className="rounded-lg bg-surface-muted px-4 py-3 text-sm leading-relaxed text-ink-secondary">
-                      For now, water is the only fully implemented footprint estimate in this dashboard.
+                    <p className="text-sm leading-relaxed text-ink-secondary">
+                      In plain English: the app first works out how heavy each supported request was relative to your
+                      own history, then scales that against a benchmark request worth {formatEnergy(methodology.energyBenchmarkKwh)}.
+                      That gives you a directional electricity estimate for the same usage already counted in tokens and
+                      water.
+                    </p>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Formula</h3>
+                    <div className="mt-3 space-y-2">
+                      <code className="block overflow-x-hidden whitespace-normal break-words rounded-lg bg-surface-muted px-4 py-3 text-xs leading-6 text-ink-secondary">
+                        energyKwh = eventCostUsd / referenceEventCostUsd * energyBenchmarkKwh
+                      </code>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Benchmark anchor</h3>
+                    <div className="mt-3 rounded-lg bg-surface-muted px-4 py-3">
+                      <p className="text-sm font-semibold text-ink">{formatEnergy(methodology.energyBenchmarkKwh)}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-ink-secondary">
+                        This is the benchmark request energy used in the model. It is helpful for comparing your own
+                        sessions over time, but it is still an estimate rather than a direct power reading from your
+                        laptop or the remote data center.
+                      </p>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Why this stays directional</h3>
+                    <div className="mt-3 rounded-lg bg-surface-muted px-4 py-3 text-sm leading-relaxed text-ink-secondary">
+                      Real electricity use shifts with model size, batching, hardware, region, and runtime conditions.
+                      So the dashboard aims to make the shape of your usage understandable, not to pretend it can meter
+                      the exact watt-hours behind every request.
                     </div>
                   </section>
 
@@ -501,15 +593,61 @@ export function MethodologyDrawer({ open, methodology, overview, defaultTab, loa
               ) : null}
 
               {activeTab === "carbon" ? (
-                <div className="space-y-6">
+                <div className="space-y-8">
                   <section className="space-y-3">
                     <p className="text-[15px] leading-relaxed text-ink-secondary">
-                      Carbon estimates are also still upcoming. When this lands, it will sit alongside water and energy
-                      so you can compare the same local usage across multiple footprint views.
+                      Carbon builds on the energy estimate rather than starting from scratch. Once the app has a
+                      directional electricity estimate for supported usage, it converts that electricity into
+                      operational CO2 with a single global grid factor.
                     </p>
-                    <div className="rounded-lg bg-surface-muted px-4 py-3 text-sm leading-relaxed text-ink-secondary">
-                      Nothing is being estimated for carbon yet, so this tab is intentionally descriptive rather than
-                      formula-driven.
+                    <p className="text-sm leading-relaxed text-ink-secondary">
+                      In other words: this is an electricity-related CO2 estimate for the same priced token activity
+                      already counted in your energy view. It is not a direct meter reading, and it is not a full
+                      lifecycle footprint for chips, buildings, or device manufacturing.
+                    </p>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Formulas</h3>
+                    <div className="mt-3 space-y-2">
+                      <code className="block overflow-x-hidden whitespace-normal break-words rounded-lg bg-surface-muted px-4 py-3 text-xs leading-6 text-ink-secondary">
+                        carbonKgCo2 = energyKwh * carbonIntensityKgCo2PerKwh
+                      </code>
+                      <code className="block overflow-x-hidden whitespace-normal break-words rounded-lg bg-surface-muted px-4 py-3 text-xs leading-6 text-ink-secondary">
+                        carbonKgCo2 = eventCostUsd / referenceEventCostUsd * carbonBenchmarkKgCo2
+                      </code>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Electricity factor</h3>
+                    <div className="mt-3 rounded-lg bg-surface-muted px-4 py-3">
+                      <p className="text-sm font-semibold text-ink">{formatCarbonIntensity(methodology.carbonIntensityKgCo2PerKwh)}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-ink-secondary">
+                        This is the default electricity-to-carbon factor used here. It is a global average, chosen so
+                        the dashboard has a stable default even when it cannot tell which grid a remote data center was
+                        actually using for your requests.
+                      </p>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Benchmark request carbon</h3>
+                    <div className="mt-3 rounded-lg bg-surface-muted px-4 py-3">
+                      <p className="text-sm font-semibold text-ink">{formatCarbon(methodology.carbonBenchmarkKgCo2)}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-ink-secondary">
+                        This comes from taking the benchmark {formatEnergy(methodology.energyBenchmarkKwh)} request used
+                        in the energy model and converting it with the same global factor.
+                      </p>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-ink">Why this stays directional</h3>
+                    <div className="mt-3 rounded-lg bg-surface-muted px-4 py-3 text-sm leading-relaxed text-ink-secondary">
+                      Real carbon intensity changes by grid, hour, hardware, and provider procurement choices. So this
+                      number is best for understanding the shape of your agent usage, not for claiming a precise
+                      supplier-specific emissions total.
                     </div>
                   </section>
 

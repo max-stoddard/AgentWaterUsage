@@ -9,8 +9,8 @@ export function DashboardFooter({ lastIndexedAt, timeZone }: DashboardFooterProp
   const indexedLabel = lastIndexedAt ? formatDateTime(lastIndexedAt) : "Loading local history...";
 
   return (
-    <footer className="mt-8 space-y-2 pt-6">
-      <div className="flex flex-col gap-2 text-sm text-ink-tertiary sm:flex-row sm:items-center sm:justify-between">
+    <footer className="mt-6 space-y-1.5 border-t border-slate-200/60 pt-4">
+      <div className="flex flex-col gap-1.5 text-xs text-ink-tertiary sm:flex-row sm:items-center sm:justify-between">
         <p>Last indexed {indexedLabel}</p>
         <p className="text-xs">Local only &middot; {timeZone}</p>
       </div>

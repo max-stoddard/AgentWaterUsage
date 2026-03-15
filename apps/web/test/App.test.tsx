@@ -20,6 +20,8 @@ interface DashboardResponseOptions {
     central: number;
     high: number;
   };
+  energyKwh?: number;
+  carbonKgCo2?: number;
 }
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
@@ -53,6 +55,8 @@ function createReadyOverviewResponse(options?: DashboardResponseOptions) {
     central: 1.2,
     high: 2.1
   };
+  const energyKwh = options?.energyKwh ?? 0.168;
+  const carbonKgCo2 = options?.carbonKgCo2 ?? 0.168 * 0.445;
 
   return {
     tokenTotals: {
@@ -62,6 +66,8 @@ function createReadyOverviewResponse(options?: DashboardResponseOptions) {
       unestimatedTokens: 50
     },
     waterLitres,
+    energyKwh,
+    carbonKgCo2,
     coverage: {
       supportedEvents: 9,
       excludedEvents: 1,
@@ -231,6 +237,9 @@ function createMethodologyResponse() {
       central: 0.016904,
       high: 0.029926
     },
+    energyBenchmarkKwh: 0.004,
+    carbonIntensityKgCo2PerKwh: 0.445,
+    carbonBenchmarkKgCo2: 0.00178,
     calibration: {
       referenceEventCostUsd: 0.123,
       computedAt: Date.parse("2026-03-09T12:00:00.000Z"),
@@ -265,6 +274,10 @@ function createMethodologyResponse() {
           url: "https://doi.org/10.1145/3724499"
         },
         {
+          label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
+          url: "https://arxiv.org/abs/2304.03271"
+        },
+        {
           label: "Ecological Economics DOI: The water footprint of coffee and tea consumption in the Netherlands",
           url: "https://doi.org/10.1016/j.ecolecon.2007.02.022"
         },
@@ -281,13 +294,45 @@ function createMethodologyResponse() {
           url: "https://www.gcsaa.org/docs/default-source/Environment/phase-2-water-use-survey-full-report.pdf?sfvrsn=2b39123e_4"
         }
       ],
-      energy: [{ label: "CodeCarbon methodology", url: "https://mlco2.github.io/codecarbon/methodology.html" }],
-      carbon: [{ label: "GHG Protocol Corporate Standard", url: "https://ghgprotocol.org/corporate-standard" }]
+      energy: [
+        {
+          label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)",
+          url: "https://doi.org/10.1145/3724499"
+        },
+        {
+          label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
+          url: "https://arxiv.org/abs/2304.03271"
+        },
+        {
+          label: "NeurIPS 2020: Language Models are Few-Shot Learners (Brown et al.)",
+          url: "https://papers.nips.cc/paper/2020/file/1457c0d6bfcb4967418bfb8ac142f64a-Paper.pdf"
+        },
+        {
+          label: "JMLR 2023: Estimating the Carbon Footprint of BLOOM",
+          url: "https://jmlr.org/papers/v24/23-0069.html"
+        }
+      ],
+      carbon: [
+        { label: "IEA Electricity 2025: Emissions", url: "https://www.iea.org/reports/electricity-2025/emissions" },
+        { label: "GHG Protocol Scope 2 Guidance", url: "https://ghgprotocol.org/scope_2_guidance" },
+        {
+          label: "GHG Protocol Scope 2 Frequently Asked Questions",
+          url: "https://ghgprotocol.org/scope-2-frequently-asked-questions"
+        },
+        {
+          label: "CACM DOI: Making AI Less 'Thirsty' (Li, Yang, Islam, Ren)",
+          url: "https://doi.org/10.1145/3724499"
+        },
+        {
+          label: "arXiv: Uncovering and Addressing the Secret Water Footprint of AI Models",
+          url: "https://arxiv.org/abs/2304.03271"
+        }
+      ]
     }
   };
 }
 
-function createTimeseriesResponse(bucket: "day" | "week" | "month", waterLitres = createReadyOverviewResponse().waterLitres) {
+function createTimeseriesResponse(bucket: "day" | "week" | "month", overview = createReadyOverviewResponse()) {
   if (bucket === "day") {
     return {
       bucket: "day",
@@ -299,7 +344,9 @@ function createTimeseriesResponse(bucket: "day" | "week" | "month", waterLitres 
           tokens: 1000,
           excludedTokens: 50,
           unestimatedTokens: 50,
-          waterLitres
+          waterLitres: overview.waterLitres,
+          energyKwh: overview.energyKwh,
+          carbonKgCo2: overview.carbonKgCo2
         }
       ]
     };
@@ -320,7 +367,9 @@ function createTimeseriesResponse(bucket: "day" | "week" | "month", waterLitres 
             low: 1,
             central: 2.4,
             high: 4.2
-          }
+          },
+          energyKwh: 0.42,
+          carbonKgCo2: 0.42 * 0.445
         }
       ]
     };
@@ -340,7 +389,9 @@ function createTimeseriesResponse(bucket: "day" | "week" | "month", waterLitres 
           low: 0.2,
           central: 0.6,
           high: 0.9
-        }
+        },
+        energyKwh: 0.09,
+        carbonKgCo2: 0.09 * 0.445
       },
       {
         startTs: Date.parse("2026-02-01T00:00:00.000Z"),
@@ -353,7 +404,9 @@ function createTimeseriesResponse(bucket: "day" | "week" | "month", waterLitres 
           low: 0,
           central: 0,
           high: 0
-        }
+        },
+        energyKwh: 0,
+        carbonKgCo2: 0
       },
       {
         startTs: Date.parse("2026-03-01T00:00:00.000Z"),
@@ -366,13 +419,15 @@ function createTimeseriesResponse(bucket: "day" | "week" | "month", waterLitres 
           low: 0.3,
           central: 0.6,
           high: 1.2
-        }
+        },
+        energyKwh: 0.12,
+        carbonKgCo2: 0.12 * 0.445
       }
     ]
   };
 }
 
-function createTimeseriesResponseForUrl(url: string, waterLitres = createReadyOverviewResponse().waterLitres) {
+function createTimeseriesResponseForUrl(url: string, overview = createReadyOverviewResponse()) {
   if (url.includes("bucket=week")) {
     return createTimeseriesResponse("week");
   }
@@ -381,7 +436,7 @@ function createTimeseriesResponseForUrl(url: string, waterLitres = createReadyOv
     return createTimeseriesResponse("month");
   }
 
-  return createTimeseriesResponse("day", waterLitres);
+  return createTimeseriesResponse("day", overview);
 }
 
 function mockDashboardResponses(options?: DashboardResponseOptions) {
@@ -398,7 +453,7 @@ function mockDashboardResponses(options?: DashboardResponseOptions) {
     }
 
     if (url.startsWith("/api/timeseries")) {
-      return jsonResponse(createTimeseriesResponseForUrl(url, overviewResponse.waterLitres));
+      return jsonResponse(createTimeseriesResponseForUrl(url, overviewResponse));
     }
 
     throw new Error(`Unexpected request: ${url}`);
@@ -428,16 +483,41 @@ describe("App", () => {
       expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
     });
 
-    expect(screen.getByText(/^Water used$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Total Agent Water Usage$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Total Agent Energy Usage$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Total Agent Carbon Usage$/i)).toBeInTheDocument();
+    expect(screen.getByText("168 Wh")).toBeInTheDocument();
+    expect(screen.getByText("75 g CO2")).toBeInTheDocument();
     expect(screen.getByText(/Understand your agent/i)).toBeInTheDocument();
     expect(screen.getByText(/footprint locally\./i)).toBeInTheDocument();
     expect(screen.queryByText(/Local coding agent insights/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Between 500.0 mL and 2.10 L/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Estimated from your local coding agent activity/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Between 500.0 mL and 2.10 L/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Pricing-weighted estimate anchored to a 4 Wh benchmark request\./i)).not.toBeInTheDocument();
     expect(screen.getByText(/Based on 47 of your prompts/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /How is this calculated\?/i })).toBeInTheDocument();
+    expect(screen.getByText(/Estimated using the latest peer-reviewed research\./i)).toBeInTheDocument();
+    expect(screen.getByText(/Your usage data stays on this device\. Nothing is uploaded\./i)).toBeInTheDocument();
+
+    const waterMethodologyButton = screen.getByRole("button", { name: /How is water calculated\?/i });
+    const energyMethodologyButton = screen.getByRole("button", { name: /How is energy calculated\?/i });
+    const carbonMethodologyButton = screen.getByRole("button", { name: /How is carbon calculated\?/i });
+
+    expect(waterMethodologyButton).toBeInTheDocument();
+    expect(energyMethodologyButton).toBeInTheDocument();
+    expect(carbonMethodologyButton).toBeInTheDocument();
+    expect(waterMethodologyButton).toHaveClass("self-start");
+    expect(energyMethodologyButton).toHaveClass("self-start");
+    expect(carbonMethodologyButton).toHaveClass("self-start");
+    expect(screen.getByTestId("carbon-usage-icon")).toBeInTheDocument();
     expect(screen.queryByText(/What that looks like/i)).not.toBeInTheDocument();
 
+    const waterCard = screen.getByText(/^Total Agent Water Usage$/i).closest("article");
+    expect(waterCard?.parentElement).toHaveClass("lg:col-span-2");
+
     const waterScaleSection = screen.getByTestId("water-scale-section");
+    const usageOverTimeSection = screen.getByText(/Usage over time/i).closest("section");
+    expect(usageOverTimeSection).not.toBeNull();
+    expect(usageOverTimeSection!.compareDocumentPosition(waterScaleSection)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(within(waterScaleSection).getByText(/Water at different scales/i)).toBeInTheDocument();
     expect(within(waterScaleSection).getByText(/order-of-magnitude context rather than a like-for-like total/i)).toBeInTheDocument();
     expect(within(waterScaleSection).getByTestId("water-scale-chart")).toBeInTheDocument();
@@ -456,8 +536,14 @@ describe("App", () => {
     expect(within(waterScaleSection).queryByText(/^Sources$/i)).not.toBeInTheDocument();
 
     expect(screen.getByText(/Usage over time/i)).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Water" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Energy" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "Carbon" })).toHaveAttribute("aria-selected", "false");
     expect(screen.getByRole("tab", { name: "Day" })).toHaveAttribute("aria-selected", "true");
-    expect(await screen.findByTestId("water-chart")).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Impact metric" })).toHaveClass("self-start");
+    expect(screen.getByRole("tablist", { name: "Usage aggregation" })).toHaveClass("self-start");
+    expect(screen.getByRole("tablist", { name: "Usage aggregation" })).not.toHaveClass("w-full");
+    expect(await screen.findByTestId("impact-chart")).toBeInTheDocument();
 
     const breakdownHeading = screen.getByText("Agent usage by model");
     const breakdownSection = breakdownHeading.closest("section");
@@ -474,9 +560,10 @@ describe("App", () => {
     expect(screen.getByText("Pricing not available")).toBeInTheDocument();
     expect(within(breakdownSection!).queryByText("Local usage")).not.toBeInTheDocument();
 
-    expect(screen.getByText(/Prompt insights/i)).toBeInTheDocument();
-    expect(screen.getByText(/Energy estimates/i)).toBeInTheDocument();
-    expect(screen.getByText(/CO2 estimates/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Coming soon/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Regional grid factors/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Richer provider coverage/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Shareable reports/i)).not.toBeInTheDocument();
 
     expect(container.querySelectorAll('img[src="/agent.svg"]').length).toBeGreaterThan(0);
     expect(screen.getByText(/Copyright Max Stoddard 2026/i)).toBeInTheDocument();
@@ -493,7 +580,7 @@ describe("App", () => {
         return overviewDeferred.promise;
       }
       if (url.startsWith("/api/timeseries")) {
-        return jsonResponse(createTimeseriesResponseForUrl(url, overviewResponse.waterLitres));
+        return jsonResponse(createTimeseriesResponseForUrl(url, overviewResponse));
       }
 
       throw new Error(`Unexpected request: ${url}`);
@@ -504,12 +591,18 @@ describe("App", () => {
     expect(screen.getByText(/Understand your agent/i)).toBeInTheDocument();
     expect(screen.getByTestId("indexing-status-card")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Scanning local usage files" })).toBeInTheDocument();
+    expect(screen.getByTestId("usage-cards-skeleton")).toBeInTheDocument();
     expect(screen.getByTestId("water-usage-card-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("energy-usage-card-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("carbon-usage-card-skeleton")).toBeInTheDocument();
     expect(screen.getByTestId("water-usage-value-skeleton")).toHaveClass("skeleton-shimmer");
     expect(screen.getByTestId("water-scale-skeleton")).toBeInTheDocument();
     expect(screen.getByTestId("usage-over-time-skeleton")).toBeInTheDocument();
     expect(screen.getByTestId("coverage-summary-skeleton")).toBeInTheDocument();
-    expect(screen.queryByTestId("water-chart")).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId("usage-over-time-skeleton").compareDocumentPosition(screen.getByTestId("water-scale-skeleton"))
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.queryByTestId("impact-chart")).not.toBeInTheDocument();
 
     overviewDeferred.resolve(jsonResponse(overviewResponse));
 
@@ -540,6 +633,8 @@ describe("App", () => {
               central: 0,
               high: 0
             },
+            energyKwh: 0,
+            carbonKgCo2: 0,
             coverage: {
               supportedEvents: 0,
               excludedEvents: 0,
@@ -587,6 +682,8 @@ describe("App", () => {
               central: 0,
               high: 0
             },
+            energyKwh: 0,
+            carbonKgCo2: 0,
             coverage: {
               supportedEvents: 0,
               excludedEvents: 0,
@@ -624,7 +721,7 @@ describe("App", () => {
       }
 
       if (url.startsWith("/api/timeseries")) {
-        return jsonResponse(createTimeseriesResponseForUrl(url, readyOverview.waterLitres));
+        return jsonResponse(createTimeseriesResponseForUrl(url, readyOverview));
       }
 
       throw new Error(`Unexpected request: ${url}`);
@@ -645,8 +742,8 @@ describe("App", () => {
     }, {
       timeout: 2000
     });
-    expect(screen.getByText("Reading session history")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "Reading session history" })).toBeInTheDocument();
+    expect(await screen.findByText("Reading session history")).toBeInTheDocument();
+    expect(await screen.findByRole("progressbar", { name: "Reading session history" })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(overviewCalls).toBe(3);
@@ -695,7 +792,7 @@ describe("App", () => {
     expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
     expect(screen.getByTestId("water-scale-section")).toBeInTheDocument();
     expect(screen.getByText("Agent usage by model")).toBeInTheDocument();
-    expect(screen.queryByTestId("water-chart")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("impact-chart")).not.toBeInTheDocument();
   });
 
   it("keeps overview sections visible while timeseries loads asynchronously", async () => {
@@ -711,7 +808,7 @@ describe("App", () => {
         return timeseriesDeferred.promise;
       }
       if (url.startsWith("/api/timeseries")) {
-        return jsonResponse(createTimeseriesResponseForUrl(url, overviewResponse.waterLitres));
+        return jsonResponse(createTimeseriesResponseForUrl(url, overviewResponse));
       }
 
       throw new Error(`Unexpected request: ${url}`);
@@ -724,14 +821,15 @@ describe("App", () => {
     });
 
     expect(screen.getByText(/Based on 47 of your prompts/i)).toBeInTheDocument();
+    expect(screen.getByText(/Estimated using the latest peer-reviewed research\./i)).toBeInTheDocument();
     expect(screen.getByTestId("water-scale-section")).toBeInTheDocument();
     expect(screen.getByText("Agent usage by model")).toBeInTheDocument();
     expect(screen.getByTestId("usage-over-time-skeleton")).toBeInTheDocument();
-    expect(screen.queryByTestId("water-chart")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("impact-chart")).not.toBeInTheDocument();
 
-    timeseriesDeferred.resolve(jsonResponse(createTimeseriesResponse("day", overviewResponse.waterLitres)));
+    timeseriesDeferred.resolve(jsonResponse(createTimeseriesResponse("day", overviewResponse)));
 
-    expect(await screen.findByTestId("water-chart")).toBeInTheDocument();
+    expect(await screen.findByTestId("impact-chart")).toBeInTheDocument();
   });
 
   it("shows a localized chart error when timeseries loading fails", async () => {
@@ -780,7 +878,7 @@ describe("App", () => {
     expect(screen.getByText(/Your AI usage/i)).toBeInTheDocument();
   });
 
-  it("uses singular prompt wording when only one prompt is counted", async () => {
+  it("keeps the split footer copy when only one prompt is counted", async () => {
     mockDashboardResponses({
       coverageSummary: {
         sessions: 12,
@@ -794,7 +892,26 @@ describe("App", () => {
       expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
     });
 
+    expect(screen.getByText("Estimated using the latest peer-reviewed research.")).toBeInTheDocument();
     expect(screen.getByText("Based on 1 of your prompt")).toBeInTheDocument();
+  });
+
+  it("formats larger energy prompt counts using the shared three-significant-figure style", async () => {
+    mockDashboardResponses({
+      coverageSummary: {
+        sessions: 12,
+        prompts: 2008
+      }
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getByText("Estimated using the latest peer-reviewed research.")).toBeInTheDocument();
+    expect(screen.getByText("Based on 2.01K of your prompts")).toBeInTheDocument();
   });
 
   it("prefetches missing week and month buckets after the active day series loads", async () => {
@@ -803,7 +920,7 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("water-chart")).toBeInTheDocument();
+      expect(screen.getByTestId("impact-chart")).toBeInTheDocument();
     });
 
     await waitFor(() => {
@@ -869,7 +986,7 @@ describe("App", () => {
         return jsonResponse(createTimeseriesResponse("month"));
       }
       if (url.startsWith("/api/timeseries")) {
-        return jsonResponse(createTimeseriesResponseForUrl(url, overviewResponse.waterLitres));
+        return jsonResponse(createTimeseriesResponseForUrl(url, overviewResponse));
       }
 
       throw new Error(`Unexpected request: ${url}`);
@@ -877,7 +994,7 @@ describe("App", () => {
 
     const { container } = render(<App />);
 
-    expect(await screen.findByTestId("water-chart")).toBeInTheDocument();
+    expect(await screen.findByTestId("impact-chart")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(monthRequests).toBe(1);
@@ -898,7 +1015,7 @@ describe("App", () => {
 
     const { container } = render(<App />);
 
-    const chart = await screen.findByTestId("water-chart");
+    const chart = await screen.findByTestId("impact-chart");
 
     expect(chart).toBeInTheDocument();
 
@@ -912,9 +1029,49 @@ describe("App", () => {
       clientY: 140
     });
 
-    expect(await screen.findByTestId("water-chart-tooltip")).toBeInTheDocument();
+    expect(await screen.findByTestId("impact-chart-tooltip")).toBeInTheDocument();
     expect(screen.getByText("9 Mar 2026")).toBeInTheDocument();
     expect(screen.getByText("1,000 tokens")).toBeInTheDocument();
+  });
+
+  it("switches the usage chart between water, energy, and carbon modes", async () => {
+    mockDashboardResponses();
+
+    const { container } = render(<App />);
+
+    expect(await screen.findByTestId("impact-chart")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Energy" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Energy" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("impact-chart")).toHaveClass("border-amber-200/80");
+    });
+
+    const chartWrapper = container.querySelector(".recharts-wrapper");
+    fireEvent.mouseMove(chartWrapper as Element, {
+      clientX: 512,
+      clientY: 140
+    });
+
+    const tooltip = await screen.findByTestId("impact-chart-tooltip");
+    expect(tooltip).toBeInTheDocument();
+    expect(within(tooltip).getByText("168 Wh")).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Energy" }), { key: "ArrowRight", code: "ArrowRight" });
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Carbon" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("impact-chart")).toHaveClass("border-slate-300/80");
+    });
+
+    fireEvent.mouseMove(chartWrapper as Element, {
+      clientX: 512,
+      clientY: 140
+    });
+
+    const carbonTooltip = await screen.findByTestId("impact-chart-tooltip");
+    expect(within(carbonTooltip).getByText("75 g CO2")).toBeInTheDocument();
   });
 
   it("opens and closes the privacy badge popup", async () => {
@@ -1004,23 +1161,45 @@ describe("App", () => {
     expect(within(methodologyDrawer).getAllByTestId("methodology-source-card").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Energy" }));
-    expect(screen.getByText(/Energy estimates are not live yet/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /CodeCarbon methodology/i })).toHaveAttribute(
+    expect(screen.getByText(/Energy uses the same pricing-weighted normalization step as water/i)).toBeInTheDocument();
+    expect(screen.getByText(/energyKwh = eventCostUsd \/ referenceEventCostUsd \* energyBenchmarkKwh/i)).toBeInTheDocument();
+    expect(screen.getAllByText("4.0 Wh").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /CACM DOI: Making AI Less 'Thirsty' \(Li, Yang, Islam, Ren\)/i })).toHaveAttribute(
       "href",
-      "https://mlco2.github.io/codecarbon/methodology.html"
+      "https://doi.org/10.1145/3724499"
+    );
+    expect(screen.getByRole("link", { name: /NeurIPS 2020: Language Models are Few-Shot Learners \(Brown et al\.\)/i })).toHaveAttribute(
+      "href",
+      "https://papers.nips.cc/paper/2020/file/1457c0d6bfcb4967418bfb8ac142f64a-Paper.pdf"
+    );
+    expect(screen.getByRole("link", { name: /JMLR 2023: Estimating the Carbon Footprint of BLOOM/i })).toHaveAttribute(
+      "href",
+      "https://jmlr.org/papers/v24/23-0069.html"
     );
     expect(within(methodologyDrawer).getAllByTestId("methodology-source-card").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Carbon" }));
-    expect(screen.getByText(/Carbon estimates are also still upcoming/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /GHG Protocol Corporate Standard/i })).toHaveAttribute(
+    expect(screen.getByText(/Carbon builds on the energy estimate rather than starting from scratch/i)).toBeInTheDocument();
+    expect(screen.getByText(/carbonKgCo2 = energyKwh \* carbonIntensityKgCo2PerKwh/i)).toBeInTheDocument();
+    expect(screen.getByText(/carbonKgCo2 = eventCostUsd \/ referenceEventCostUsd \* carbonBenchmarkKgCo2/i)).toBeInTheDocument();
+    expect(screen.getAllByText("445 g CO2/kWh").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1.8 g CO2").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /IEA Electricity 2025: Emissions/i })).toHaveAttribute(
       "href",
-      "https://ghgprotocol.org/corporate-standard"
+      "https://www.iea.org/reports/electricity-2025/emissions"
+    );
+    expect(screen.getByRole("link", { name: /GHG Protocol Scope 2 Guidance/i })).toHaveAttribute(
+      "href",
+      "https://ghgprotocol.org/scope_2_guidance"
+    );
+    expect(screen.getByRole("link", { name: /GHG Protocol Scope 2 Frequently Asked Questions/i })).toHaveAttribute(
+      "href",
+      "https://ghgprotocol.org/scope-2-frequently-asked-questions"
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Water" }));
     expect(
-      within(methodologyDrawer).getByText(/Hovering the chart reveals what each point means, and the source cards below explain where each comparison comes from/i)
+      within(methodologyDrawer).getByText(/So this number is best read as context, not as a literal meter reading from your machine/i)
     ).toBeInTheDocument();
     expect(within(methodologyDrawer).getAllByTestId("methodology-source-card").length).toBeGreaterThan(0);
     expect(within(methodologyDrawer).getByText("A cup of water")).toBeInTheDocument();
@@ -1073,13 +1252,51 @@ describe("App", () => {
       expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /How is this calculated\?/i }));
+    fireEvent.click(screen.getByRole("button", { name: /How is water calculated\?/i }));
 
     expect(await screen.findByRole("dialog", { name: /How it works/i })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Water" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Prompts" })).toHaveAttribute("aria-pressed", "false");
     expect(
-      screen.getByText(/Hovering the chart reveals what each point means, and the source cards below explain where each comparison comes from/i)
+      screen.getByText(/So this number is best read as context, not as a literal meter reading from your machine/i)
+    ).toBeInTheDocument();
+  });
+
+  it("opens the methodology drawer on the energy tab from the energy usage card", async () => {
+    mockDashboardResponses();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /How is energy calculated\?/i }));
+
+    expect(await screen.findByRole("dialog", { name: /How it works/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Energy" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Prompts" })).toHaveAttribute("aria-pressed", "false");
+    expect(
+      screen.getByText(/Energy uses the same pricing-weighted normalization step as water/i)
+    ).toBeInTheDocument();
+  });
+
+  it("opens the methodology drawer on the carbon tab from the carbon usage card", async () => {
+    mockDashboardResponses();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("1.20 L").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /How is carbon calculated\?/i }));
+
+    expect(await screen.findByRole("dialog", { name: /How it works/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Carbon" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Prompts" })).toHaveAttribute("aria-pressed", "false");
+    expect(
+      screen.getByText(/Carbon builds on the energy estimate rather than starting from scratch/i)
     ).toBeInTheDocument();
   });
 
@@ -1149,6 +1366,8 @@ describe("App", () => {
             central: 0,
             high: 0
           },
+          energyKwh: 0,
+          carbonKgCo2: 0,
           coverage: {
             supportedEvents: 0,
             excludedEvents: 0,
@@ -1188,7 +1407,7 @@ describe("App", () => {
     expect(screen.getByText(/No readable local usage history was found at the current path yet/i)).toBeInTheDocument();
     expect(screen.getByText("No usage files were found in this directory yet.")).toBeInTheDocument();
     expect(screen.getByText("/home/dev/.codex")).toBeInTheDocument();
-    expect(screen.getByText(/Prompt insights/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Regional grid factors/i)).not.toBeInTheDocument();
   });
 
   it("shows a neutral read error when the current local path cannot be read", async () => {
@@ -1207,6 +1426,8 @@ describe("App", () => {
             central: 0,
             high: 0
           },
+          energyKwh: 0,
+          carbonKgCo2: 0,
           coverage: {
             supportedEvents: 0,
             excludedEvents: 0,

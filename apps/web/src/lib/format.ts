@@ -94,6 +94,50 @@ export function formatLitres(value: number): string {
   }).format(value)} L`;
 }
 
+export function formatEnergy(value: number): string {
+  if (value === 0) {
+    return "0 Wh";
+  }
+
+  const absolute = Math.abs(value);
+  if (absolute < 1) {
+    const wattHours = value * 1000;
+    return `${new Intl.NumberFormat("en-GB", {
+      minimumFractionDigits: Math.abs(wattHours) < 10 ? 1 : 0,
+      maximumFractionDigits: Math.abs(wattHours) < 10 ? 1 : 0
+    }).format(wattHours)} Wh`;
+  }
+
+  return `${new Intl.NumberFormat("en-GB", {
+    minimumFractionDigits: absolute < 10 ? 2 : 1,
+    maximumFractionDigits: absolute < 10 ? 2 : 1
+  }).format(value)} kWh`;
+}
+
+export function formatCarbon(value: number): string {
+  if (value === 0) {
+    return "0 g CO2";
+  }
+
+  if (Math.abs(value) < 1) {
+    return `${new Intl.NumberFormat("en-GB", {
+      minimumFractionDigits: Math.abs(value * 1000) < 10 ? 1 : 0,
+      maximumFractionDigits: Math.abs(value * 1000) < 10 ? 1 : 0
+    }).format(value * 1000)} g CO2`;
+  }
+
+  return `${new Intl.NumberFormat("en-GB", {
+    minimumFractionDigits: Math.abs(value) < 10 ? 2 : 1,
+    maximumFractionDigits: Math.abs(value) < 10 ? 2 : 1
+  }).format(value)} kg CO2`;
+}
+
+export function formatCarbonIntensity(value: number): string {
+  return `${new Intl.NumberFormat("en-GB", {
+    maximumFractionDigits: 0
+  }).format(value * 1000)} g CO2/kWh`;
+}
+
 export function formatDateTime(value: number | null): string {
   if (!value) {
     return "Not indexed yet";
