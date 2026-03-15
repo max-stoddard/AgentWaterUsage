@@ -30,6 +30,25 @@ export function getDefaultClaudeHome(): string {
   return path.join(os.homedir(), ".claude");
 }
 
+export function getGeminiHomeConfig(): CodexHomeConfig {
+  const configured = process.env.GEMINI_HOME;
+  if (configured) {
+    return {
+      fromEnv: true,
+      path: path.resolve(configured)
+    };
+  }
+
+  return {
+    fromEnv: false,
+    path: path.join(os.homedir(), ".gemini")
+  };
+}
+
+export function getDefaultGeminiHome(): string {
+  return getGeminiHomeConfig().path;
+}
+
 export function getCacheDir(): string {
   const configured = process.env.AGENTIC_INSIGHTS_CACHE_DIR;
   if (configured) {

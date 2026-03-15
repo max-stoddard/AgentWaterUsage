@@ -27,7 +27,7 @@ export interface RawUsageEvent {
   cachedInputTokens: number | null;
   outputTokens: number | null;
   splitSource: "last_usage" | "derived_totals" | "missing";
-  transport: "session" | "tui_fallback" | "claude_project" | "claude_summary";
+  transport: "session" | "tui_fallback" | "claude_project" | "claude_summary" | "gemini_cli";
 }
 
 export interface ClassifiedUsageEvent extends RawUsageEvent {

@@ -46,6 +46,22 @@ export function listClaudeSessionMetaFiles(claudeHome: string): FileRecord[] {
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+export function listGeminiSessionFiles(geminiHome: string): FileRecord[] {
+  const files: FileRecord[] = [];
+  const tmpDir = path.join(geminiHome, "tmp");
+
+  if (fs.existsSync(tmpDir)) {
+    for (const dirent of fs.readdirSync(tmpDir, { withFileTypes: true })) {
+      if (dirent.isDirectory()) {
+        const chatsDir = path.join(tmpDir, dirent.name, "chats");
+        walkFiles(chatsDir, ".json", files);
+      }
+    }
+  }
+
+  return files.sort((a, b) => a.path.localeCompare(b.path));
+}
+
 export function getTuiLogPath(codexHome: string): string {
   return path.join(codexHome, "log", "codex-tui.log");
 }

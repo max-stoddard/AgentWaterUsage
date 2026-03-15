@@ -18,8 +18,21 @@ import type {
 } from "@agentic-insights/shared";
 import { getOrCreateCalibration, buildSignature } from "./calibration.js";
 import { parseClaudeProjectFile, parseClaudeSessionMetaFile } from "./claude.js";
-import { getTuiLogPath, listClaudeProjectFiles, listClaudeSessionMetaFiles, listSessionFiles } from "./discovery.js";
-import { ensureDirSync, getCodexHomeConfig, getDefaultClaudeHome, getTimeseriesCachePath } from "./paths.js";
+import { parseGeminiSessionFile } from "./gemini.js";
+import {
+  getTuiLogPath,
+  listClaudeProjectFiles,
+  listClaudeSessionMetaFiles,
+  listGeminiSessionFiles,
+  listSessionFiles
+} from "./discovery.js";
+import {
+  ensureDirSync,
+  getCodexHomeConfig,
+  getDefaultClaudeHome,
+  getDefaultGeminiHome,
+  getTimeseriesCachePath
+} from "./paths.js";
 import { parseSessionFile, parseSessionPrompts, parseTuiFallback } from "./parser.js";
 import { aggregateDayTimeseries, aggregateFromDayBuckets } from "./aggregation.js";
 import { getBucketStartTs, shiftZonedDateTimeByDays } from "./timezone.js";
@@ -39,6 +52,7 @@ const DISCOVERY_CACHE_TTL_MS = 1_000;
 interface DiscoveredInputs {
   codexHome: string;
   claudeHome: string;
+  geminiHome: string;
   dataPath: string;
   signature: string;
   fingerprint: Array<{ path: string; mtimeMs: number; size: number }>;
@@ -47,6 +61,7 @@ interface DiscoveredInputs {
   codexFiles: Array<{ path: string; mtimeMs: number; size: number }>;
   claudeProjectFiles: Array<{ path: string; mtimeMs: number; size: number }>;
   claudeSessionMetaFiles: Array<{ path: string; mtimeMs: number; size: number }>;
+  geminiFiles: Array<{ path: string; mtimeMs: number; size: number }>;
   tuiLogPath: string;
 }
 
@@ -686,6 +701,7 @@ export class DashboardService {
     const codexHomeConfig = getCodexHomeConfig();
     const codexHome = codexHomeConfig.path;
     const claudeHome = getDefaultClaudeHome();
+    const geminiHome = getDefaultGeminiHome();
     const dataPath = getMonitoredDataPath(codexHome, claudeHome);
 
     try {
@@ -693,6 +709,8 @@ export class DashboardService {
       const codexIsDirectory = codexExists && fs.statSync(codexHome).isDirectory();
       const claudeExists = fs.existsSync(claudeHome);
       const claudeIsDirectory = claudeExists && fs.statSync(claudeHome).isDirectory();
+      const geminiExists = fs.existsSync(geminiHome);
+      const geminiIsDirectory = geminiExists && fs.statSync(geminiHome).isDirectory();
 
       const codexFiles = codexIsDirectory ? listSessionFiles(codexHome) : [];
       const tuiLogPath = getTuiLogPath(codexHome);
@@ -702,11 +720,14 @@ export class DashboardService {
           : [];
       const claudeProjectFiles = claudeIsDirectory ? listClaudeProjectFiles(claudeHome) : [];
       const claudeSessionMetaFiles = claudeIsDirectory ? listClaudeSessionMetaFiles(claudeHome) : [];
+      const geminiFiles = geminiIsDirectory ? listGeminiSessionFiles(geminiHome) : [];
+
       const fingerprint = [
         ...codexFiles.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size })),
         ...logFingerprint,
         ...claudeProjectFiles.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size })),
-        ...claudeSessionMetaFiles.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size }))
+        ...claudeSessionMetaFiles.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size })),
+        ...geminiFiles.map((file) => ({ path: file.path, mtimeMs: file.mtimeMs, size: file.size }))
       ];
       const foundArtifacts = fingerprint.length > 0;
       const codexConfiguredInvalid =
@@ -714,12 +735,14 @@ export class DashboardService {
       const signature = buildSignature({
         codexHome,
         claudeHome,
+        geminiHome,
         codexHomeState: codexIsDirectory ? "ready" : "empty",
         fileFingerprint: fingerprint
       });
       const discoveredInputs = {
         codexHome,
         claudeHome,
+        geminiHome,
         dataPath,
         signature,
         fingerprint,
@@ -728,6 +751,7 @@ export class DashboardService {
         codexFiles,
         claudeProjectFiles,
         claudeSessionMetaFiles,
+        geminiFiles,
         tuiLogPath
       };
       this.discoveryMemo = {
@@ -774,6 +798,10 @@ export class DashboardService {
     const codexEvents = discovery.codexFiles.flatMap((file) => parseSessionFile(file.path, fallbackMap));
     const codexPrompts = discovery.codexFiles.flatMap((file) => parseSessionPrompts(file.path));
 
+    const geminiParsed = discovery.geminiFiles.map((file) => parseGeminiSessionFile(file.path));
+    const geminiEvents = geminiParsed.flatMap((parsed) => parsed.events);
+    const geminiPrompts = geminiParsed.flatMap((parsed) => parsed.prompts);
+
     const claudeSessionModels = new Map<string, string>();
     const parsedClaudeProjects = discovery.claudeProjectFiles.map((file) => parseClaudeProjectFile(file.path));
     const claudeProjectEvents = parsedClaudeProjects.flatMap((parsed) => {
@@ -792,8 +820,13 @@ export class DashboardService {
       })
     );
 
-    const rawEvents = dedupeEvents([...codexEvents, ...claudeProjectEvents, ...claudeMetaEvents]);
-    const promptRecords = dedupePrompts([...codexPrompts, ...claudeProjectPrompts]);
+    const rawEvents = dedupeEvents([
+      ...codexEvents,
+      ...geminiEvents,
+      ...claudeProjectEvents,
+      ...claudeMetaEvents
+    ]);
+    const promptRecords = dedupePrompts([...codexPrompts, ...geminiPrompts, ...claudeProjectPrompts]);
     const diagnostics =
       rawEvents.length > 0 || promptRecords.length > 0
         ? createDiagnostics("ready", dataPath, null)

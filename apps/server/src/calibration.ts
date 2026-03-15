@@ -12,6 +12,7 @@ interface CalibrationFile {
 interface SignatureInput {
   codexHome: string;
   claudeHome?: string;
+  geminiHome?: string;
   codexHomeState: string;
   fileFingerprint: Array<{ path: string; mtimeMs: number; size: number }>;
 }
@@ -20,14 +21,21 @@ function getCalibrationPath(): string {
   return path.join(getCacheDir(), "calibration.json");
 }
 
-export function buildSignature({ codexHome, claudeHome, codexHomeState, fileFingerprint }: SignatureInput): string {
+export function buildSignature({
+  codexHome,
+  claudeHome,
+  geminiHome,
+  codexHomeState,
+  fileFingerprint
+}: SignatureInput): string {
   return crypto
     .createHash("sha1")
     .update(
-        JSON.stringify({
+      JSON.stringify({
         pricingVersion: "2026-03-13-portkey-catalog",
         codexHome,
         claudeHome,
+        geminiHome,
         codexHomeState,
         files: fileFingerprint
       })
