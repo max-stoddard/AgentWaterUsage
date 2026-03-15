@@ -2,8 +2,8 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       tag_name:
@@ -20,16 +20,43 @@ jobs:
       id-token: write
       packages: write
     env:
-      TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || github.ref_name }}
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.TAG_NAME }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || github.sha }}
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release_context
+        shell: bash
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "tag_name=${{ github.event.inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          TAG_NAME="$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n 1)"
+
+          if [ -z "$TAG_NAME" ]; then
+            echo "No v* tag points at HEAD; skipping release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+
+      - name: Skip when HEAD is not tagged for release
+        if: ${{ steps.release_context.outputs.should_release != 'true' }}
+        shell: bash
+        run: echo "Release workflow only publishes tagged commits."
 
       - name: Set up Node.js
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -37,17 +64,21 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Clear legacy npm auth config
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         shell: bash
         run: npm config delete always-auth --location=user || true
 
       - name: Install dependencies
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         run: npm ci
 
       - name: Verify tag matches package version
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         shell: bash
         run: |
           PACKAGE_VERSION="$(node -e "console.log(JSON.parse(require('node:fs').readFileSync('packages/cli/package.json', 'utf8')).version)")"
-          TAG_VERSION="${TAG_NAME#v}"
+          TAG_VERSION="${{ steps.release_context.outputs.tag_name }}"
+          TAG_VERSION="${TAG_VERSION#v}"
 
           if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
             echo "Tag version ($TAG_VERSION) does not match packages/cli/package.json ($PACKAGE_VERSION)."
@@ -55,22 +86,27 @@ jobs:
           fi
 
       - name: Lint
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         run: npm run lint
 
       - name: Test
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         run: npm run test
 
       - name: Build
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         run: npm run build
 
       - name: Run packed launcher smoke test
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         run: npm run test:pack
 
       - name: Prepare release notes
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         id: release_notes
         shell: bash
         run: |
-          RELEASE_NOTES_PATH=".github/release-notes/${TAG_NAME}.md"
+          RELEASE_NOTES_PATH=".github/release-notes/${{ steps.release_context.outputs.tag_name }}.md"
 
           if [ ! -f "$RELEASE_NOTES_PATH" ]; then
             echo "Missing release notes file: $RELEASE_NOTES_PATH"
@@ -80,6 +116,7 @@ jobs:
           echo "path=$RELEASE_NOTES_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Check npm publish status
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         id: npm_status
         shell: bash
         run: |
@@ -93,19 +130,21 @@ jobs:
           fi
 
       - name: Publish npm package with automation token
-        if: ${{ steps.npm_status.outputs.exists != 'true' && env.NPM_TOKEN != '' }}
+        if: ${{ steps.release_context.outputs.should_release == 'true' && steps.npm_status.outputs.exists != 'true' && env.NPM_TOKEN != '' }}
         run: npm publish -w agentic-insights --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
 
       - name: Publish npm package with trusted publishing
-        if: ${{ steps.npm_status.outputs.exists != 'true' && env.NPM_TOKEN == '' }}
+        if: ${{ steps.release_context.outputs.should_release == 'true' && steps.npm_status.outputs.exists != 'true' && env.NPM_TOKEN == '' }}
         run: npm publish -w agentic-insights --access public --provenance
 
       - name: Prepare GitHub Packages mirror
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         run: node ./packages/cli/scripts/prepare-github-package.mjs
 
       - name: Set up Node.js for GitHub Packages
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -113,13 +152,15 @@ jobs:
           scope: "@max-stoddard"
 
       - name: Publish GitHub Packages mirror
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         run: npm publish ./packages/cli/.github-package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
+        if: ${{ steps.release_context.outputs.should_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.TAG_NAME }}
+          tag_name: ${{ steps.release_context.outputs.tag_name }}
           body_path: ${{ steps.release_notes.outputs.path }}
           generate_release_notes: true

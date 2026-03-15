@@ -63,10 +63,16 @@ describe("release metadata", () => {
 
     expect(releaseWorkflow).toContain("packages: write");
     expect(releaseWorkflow).toContain("workflow_dispatch:");
+    expect(releaseWorkflow).toContain("branches:");
+    expect(releaseWorkflow).toContain("- main");
     expect(releaseWorkflow).toContain("tag_name:");
-    expect(releaseWorkflow).toContain("TAG_NAME:");
     expect(releaseWorkflow).toContain("NPM_TOKEN: ${{ secrets.NPM_TOKEN }}");
-    expect(releaseWorkflow).toContain("ref: ${{ env.TAG_NAME }}");
+    expect(releaseWorkflow).toContain("ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || github.sha }}");
+    expect(releaseWorkflow).toContain("fetch-depth: 0");
+    expect(releaseWorkflow).toContain("Resolve release tag");
+    expect(releaseWorkflow).toContain("git tag --points-at HEAD --list 'v*'");
+    expect(releaseWorkflow).toContain("No v* tag points at HEAD; skipping release.");
+    expect(releaseWorkflow).toContain("Release workflow only publishes tagged commits.");
     expect(releaseWorkflow).toContain("npm config delete always-auth --location=user || true");
     expect(releaseWorkflow).toContain("Check npm publish status");
     expect(releaseWorkflow).toContain('npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry https://registry.npmjs.org');
@@ -74,6 +80,7 @@ describe("release metadata", () => {
     expect(releaseWorkflow).toContain("env.NPM_TOKEN != ''");
     expect(releaseWorkflow).toContain("env.NPM_TOKEN == ''");
     expect(releaseWorkflow).toContain("steps.npm_status.outputs.exists != 'true'");
+    expect(releaseWorkflow).toContain("steps.release_context.outputs.should_release == 'true'");
     expect(releaseWorkflow).toContain("NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}");
     expect(releaseWorkflow).toContain("npm publish -w agentic-insights --access public --provenance");
     expect(releaseWorkflow).toContain("node ./packages/cli/scripts/prepare-github-package.mjs");
@@ -81,7 +88,7 @@ describe("release metadata", () => {
     expect(releaseWorkflow).toContain('scope: "@max-stoddard"');
     expect(releaseWorkflow).toContain("npm publish ./packages/cli/.github-package");
     expect(releaseWorkflow).toContain("https://npm.pkg.github.com");
-    expect(releaseWorkflow).toContain("tag_name: ${{ env.TAG_NAME }}");
+    expect(releaseWorkflow).toContain("tag_name: ${{ steps.release_context.outputs.tag_name }}");
     expect(releaseWorkflow).toContain("softprops/action-gh-release@v2");
   });
 
