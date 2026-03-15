@@ -1,11 +1,11 @@
 # Agentic Insights
 
-`agentic-insights` launches a local dashboard that reads your Codex and Claude Code usage artifacts and helps you understand coding-agent usage, starting with water-impact estimates.
+`agentic-insights` launches a local dashboard that reads your Codex and Claude Code usage artifacts and helps you understand coding-agent usage with token, water, energy, and carbon estimates.
 
 ## Run
 
 ```bash
-npx agentic-insights@0.1.1
+npx agentic-insights@0.1.2
 ```
 
 That command starts a local server, opens the dashboard in your browser, and reads usage data from your machine.

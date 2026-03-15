@@ -10,6 +10,7 @@
   - You must ensure Windows, Linux and MacOS compatibility in all tasks.
 - Root level `README.md` is developer facing on GitHub, keep this in mind when editing it.
 - Lanaguage on the website should be friendly, easy to understand, concise and high level, focussed on helping the user of the website understand what the parts of the website are trying to show them.
+- Numbers should use the shared 3 s.f. formatting style where available unless the task explicitly requires something else or that formatting would be illogical.
 - Ask as many questions as necessary to effectively scope requirements for tasks.
 - You MUST write tests smoke tests for every task you do and then run build and test validation. Ensure to run:
   - `npm run lint`

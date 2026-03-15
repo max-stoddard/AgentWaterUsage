@@ -1,13 +1,13 @@
 # Agentic Insights
 
-Local TypeScript dashboard that reads Codex and Claude Code usage artifacts from your machine and helps you understand coding-agent activity, starting with water-impact estimates from token usage.
+Local TypeScript dashboard that reads Codex and Claude Code usage artifacts from your machine and helps you understand coding-agent activity with token, water, energy, and carbon estimates.
 
 ## Launch in one command
 
 Requires Node `18+`.
 
 ```bash
-npx agentic-insights@0.1.1
+npx agentic-insights@0.1.2
 ```
 
 That command starts a local server, opens the dashboard in your browser, and reads local coding-agent usage from your own machine.
@@ -53,7 +53,9 @@ You can override the Codex home directory with `CODEX_HOME=/path/to/.codex` or `
 
 - Total token usage
 - Total estimated water usage with low, central, and high bounds
-- Water usage aggregated by day, week, or month
+- Total estimated energy usage
+- Total estimated operational carbon usage
+- Water, energy, or carbon usage aggregated by day, week, or month
 - Coverage information for supported, excluded, and unestimated usage
 
 ## Methodology
@@ -139,26 +141,58 @@ In this app, those literature values act as low, central, and high benchmark anc
 
 They are not a physical measurement from your machine.
 
-### 5. What is excluded from water totals
+### 5. The app also converts the weighted proxy into energy
+
+Energy uses the same normalized `eventCostUsd / referenceEventCostUsd` multiplier as water, but applies a single benchmark request energy of `0.004 kWh` [1,2,9].
+
+For each supported event:
+
+```text
+energyKwh = eventCostUsd / referenceEventCostUsd * 0.004
+```
+
+This keeps the energy estimate consistent with the water estimate while avoiding a made-up uncertainty band. The number is still directional rather than a direct watt-hour reading from your device or the remote data center [10].
+
+### 6. The app also converts energy into carbon
+
+Carbon starts with the same benchmarked energy estimate and applies a single global electricity emissions factor of `0.445 kg CO2/kWh` from the IEA's 2024 global average electricity intensity [11,12].
+
+For each supported event:
+
+```text
+carbonKgCo2 = energyKwh * 0.445
+```
+
+Equivalently:
+
+```text
+carbonKgCo2 = eventCostUsd / referenceEventCostUsd * 0.00178
+```
+
+where `0.00178 kg CO2` is the carbon footprint of the benchmark `0.004 kWh` request after applying the same global factor.
+
+This is an operational electricity-related CO2 estimate for supported inference activity. It is not a direct meter reading, and it is not a full lifecycle footprint for chip fabrication, data-center construction, or end-user device manufacturing [11,12].
+
+### 7. What is excluded from water, energy, and carbon totals
 
 The app intentionally does not guess when it lacks enough information.
 
-Excluded from water totals:
+Excluded from water, energy, and carbon totals:
 
 - Unsupported providers and models, such as local `ollama` sessions
 - `token_only` fallback events recovered from TUI totals without split token counts
 
 These still appear in token totals and coverage summaries so the dashboard stays honest about what is and is not estimated.
 
-### 6. Why this is an estimate, not a meter reading
+### 8. Why this is an estimate, not a meter reading
 
-The dashboard is exact about tokens, but only estimated about water.
+The dashboard is exact about tokens, but estimated about water, energy, and carbon.
 
 The main uncertainty comes from three places:
 
 - OpenAI price ratios are being used as a compute-intensity proxy, not as billed spend shown to the user
 - The local median calibration step is a normalization choice, not a physical measurement
-- The low/central/high benchmark coefficients are literature benchmarks taken from a GPT-3 request scenario and then reused as anchors for Codex events after local normalization [1,2]
+- The water low/central/high coefficients, the `0.004 kWh` energy anchor, and the `0.445 kg CO2/kWh` carbon factor are literature and standards-based anchors reused as normalized defaults for coding-agent events [1,2,9,10,11,12]
 
 ## API
 
@@ -180,7 +214,7 @@ npm run test:pack
 
 ## Release
 
-Releases are cut from GitHub Actions on tags like `v0.1.1`.
+Releases are cut from GitHub Actions on tags like `v0.1.2`.
 
 The release workflow:
 
@@ -214,3 +248,11 @@ Before cutting a release:
 [7] OpenAI. GPT-5.3-Codex model [Internet]. 2026 [cited 2026 Mar 9]. Available from: https://developers.openai.com/api/docs/models/gpt-5.3-codex
 
 [8] OpenAI. GPT-5.4 model [Internet]. 2026 [cited 2026 Mar 9]. Available from: https://developers.openai.com/api/docs/models/gpt-5.4
+
+[9] Brown T, Mann B, Ryder N, et al. Language Models are Few-Shot Learners. Adv Neural Inf Process Syst. 2020;33:1877-1901. Available from: https://papers.nips.cc/paper/2020/file/1457c0d6bfcb4967418bfb8ac142f64a-Paper.pdf
+
+[10] Luccioni AS, Luccioni A, Dumas M, et al. Estimating the Carbon Footprint of BLOOM, a 176B Parameter Language Model. J Mach Learn Res. 2023;24(253):1-15. Available from: https://jmlr.org/papers/v24/23-0069.html
+
+[11] International Energy Agency. Electricity 2025: Emissions [Internet]. 2025 [cited 2026 Mar 15]. Available from: https://www.iea.org/reports/electricity-2025/emissions
+
+[12] GHG Protocol. Scope 2 Guidance [Internet]. [cited 2026 Mar 15]. Available from: https://ghgprotocol.org/scope_2_guidance

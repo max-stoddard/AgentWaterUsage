@@ -1,7 +1,7 @@
 {
   "name": "agentic-insights",
-  "version": "0.1.1",
-  "description": "Launch a local dashboard for coding-agent insights with water-impact estimates",
+  "version": "0.1.2",
+  "description": "Launch a local dashboard for coding-agent insights with water, energy, and carbon estimates",
   "license": "MIT",
   "type": "module",
   "repository": {
